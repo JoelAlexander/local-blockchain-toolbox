@@ -1,0 +1,72 @@
+version: "3.8"
+
+services:
+    wellesley-hub-proxy:
+        container_name: wellesley-hub-proxy
+        image: nginx:stable
+        depends_on:
+            - geth-rpcnode
+        ports:
+            - 80:80
+            - 443:443
+        volumes:
+            - ./nginx.conf:/etc/nginx/conf.d/default.conf:ro
+            - /etc/letsencrypt/archive/crypto.joelalexander.me:/etc/ssl/certs/crypto.joelalexander.me/:ro
+            - /etc/letsencrypt/archive/hyphen.joelalexander.me:/etc/ssl/certs/hyphen.joelalexander.me/:ro
+            - /home/ubuntu/hyphen/dist:/var/www:ro
+        networks:
+            - default
+            - geth-net
+        restart: unless-stopped
+
+    geth-bootnode:
+        container_name: geth-bootnode
+        image: bootnode:latest
+        command: ["--netrestrict", "172.172.172.0/28", "--nat", "extip:172.172.172.4"]
+        volumes:
+            - bootnode_volume:/.ethereum/
+        networks:
+            geth-net:
+                ipv4_address: 172.172.172.4
+        restart: unless-stopped
+
+    geth-sealingnode:
+        container_name: geth-sealingnode
+        image: sealingnode:latest
+        command: ["--netrestrict", "172.172.172.0/28", "--networkid", "5904", "--nat", "extip:172.172.172.2", "--bootnodes", "enode://${BOOTNODE_ENODE}@172.172.172.4:0?discport=30301"]
+        volumes:
+            - sealingnode_volume:/.ethereum/
+        depends_on:
+            - geth-bootnode
+        networks:
+            geth-net:
+                ipv4_address: 172.172.172.2
+        restart: unless-stopped
+
+    geth-rpcnode:
+        container_name: geth-rpcnode
+        image: rpcnode:latest
+        command: ["--netrestrict", "172.172.172.0/28", "--networkid", "5904", "--nat", "extip:172.172.172.3", "--bootnodes", "enode://1d05af8c82da61c20fbe84bfe9b314492960a2d4507bdbcad64ac357bf67944c442cd34ba176c8fe8c8098367efb429f22f9fb1e883f71ff9e1c88e2cf794c6a@172.172.172.4:0?discport=30301"]
+        volumes:
+            - rpcnode_volume:/.ethereum/
+        depends_on:
+            - geth-bootnode
+        ports:
+            - 8545:8545
+        networks:
+            geth-net:
+                ipv4_address: 172.172.172.3
+        restart: unless-stopped
+
+volumes:
+    bootnode_volume:
+    sealingnode_volume:
+    rpcnode_volume:
+
+networks:
+    geth-net:
+        driver: bridge
+        ipam:
+            config:
+                - subnet: "172.172.172.0/28"
+                  gateway: "172.172.172.1"
