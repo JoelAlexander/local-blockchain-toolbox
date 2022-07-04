@@ -1,10 +1,13 @@
 # syntax=docker/dockerfile:1
 from ubuntu
 
-ARG GETH_BIN
 ARG GENESIS_FILE
+ARG GETH_BIN
 
-COPY ${GETH_BIN}/geth ./geth
 COPY ${GENESIS_FILE} ./genesis.json
 
-ENTRYPOINT ["./geth", "--genesis", "genesis.json", "--txpool.lifetime", "12s", "--txpool.pricebump", "5"]
+COPY ${GETH_BIN}/* ./gethbin/
+ENV PATH="/gethbin:$PATH"
+RUN geth init genesis.json --datadir .ethereum
+
+ENTRYPOINT ["geth", "--datadir", ".ethereum", "--http", "--http.addr", "0.0.0.0", "--http.vhosts", "*", "--http.corsdomain", "*", "--http.api", "eth,net,rpc,web3,txpool", "--txpool.lifetime", "12s", "--txpool.pricebump", "5"]
