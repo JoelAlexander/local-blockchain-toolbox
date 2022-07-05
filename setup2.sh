@@ -29,6 +29,7 @@ bootnode="$gethName/bootnode"
 # Reads from the .env file, reusing values that it can, and creating what's needed.
 bootnodeKey=$([ -f .env ] && awk -F'=' '/^BOOTNODE_KEY/ { print $2 }' .env | head -1)
 if [ -z "${bootnodeKey}" ]; then
+  echo "Creating new bootnode."
   bootnodeKey=bootnode.key
   bootnodeEnode=$($bootnode -genkey bootnode.key -writeaddress)
 else
@@ -70,7 +71,6 @@ fi
 # Create the images we'll need and start them
 docker build -f bootnode/Dockerfile -t bootnode:latest\
   --build-arg GETH_BIN="$gethName"\
-  --build-arg BOOTNODE_KEY=$bootnodeKey\
   .
 
 docker build -f gethnode/Dockerfile -t gethnode:latest\
