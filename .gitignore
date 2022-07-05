@@ -1,1 +1,7 @@
+.env
+*.key
+*.json
+*.txt
+*.tar.gz
 keystore**
+geth**
