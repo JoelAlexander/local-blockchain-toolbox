@@ -5,3 +5,4 @@
 *.tar.gz
 keystore**
 geth**
+nvm_install.sh
