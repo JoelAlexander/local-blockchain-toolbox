@@ -73,19 +73,8 @@ docker build -f bootnode/Dockerfile -t bootnode:latest\
   --build-arg BOOTNODE_KEY=$bootnodeKey\
   .
 
-docker build -f rpcnode/Dockerfile -t rpcnode:latest\
+docker build -f gethnode/Dockerfile -t gethnode:latest\
   --build-arg GETH_BIN="$gethName"\
-  --build-arg GENESIS_FILE=genesis.json\
-  --build-arg CHAIN_ID=$chainId\
-  .
-
-docker build -f sealingnode/Dockerfile -t sealingnode:latest\
-  --build-arg GETH_BIN="$gethName"\
-  --build-arg ACCOUNT_ADDRESS=$sealerAccount\
-  --build-arg ACCOUNT_KEYSTORE=$sealerKeystore\
-  --build-arg GENESIS_FILE=$genesisFile\
-  --build-arg PASSWORD_FILE=$sealerPassword\
-  --build-arg CHAIN_ID=$chainId\
   .
 
 echo "BOOTNODE_ENODE=$bootnodeEnode" > .env
@@ -96,4 +85,4 @@ echo "SEALER_KEYSTORE=$sealerKeystore" >> .env
 echo "SEALER_PASSWORD=$sealerPassword" >> .env
 echo "CHAIN_ID=$chainId" >> .env
 
-docker-compose up
+docker compose up

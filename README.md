@@ -10,6 +10,8 @@ sudo dd if=~/Downloads/nixos-sd-image-20.09.4409.66b0db71f46-aarch64-linux.img o
 
 Once booted from SD card:
 
+Need some way to remove all files including .env before running setup.
+
 scp local-blockchain-node.tar.gz ubuntu@joelalexander.me:~/. && ssh ubuntu@joelalexander.me 'tar -xvzf local-blockchain-node.tar.gz && source ./setup.sh'
 
 

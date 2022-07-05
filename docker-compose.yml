@@ -1,8 +1,8 @@
 version: "3.8"
 
 services:
-    # wellesley-hub-proxy:
-    #     container_name: wellesley-hub-proxy
+    # nginx:
+    #     container_name: nginx
     #     image: nginx:stable
     #     depends_on:
     #         - geth-rpcnode
@@ -22,7 +22,12 @@ services:
     geth-bootnode:
         container_name: geth-bootnode
         image: bootnode:latest
-        command: ["--netrestrict", "172.172.172.0/28", "--nat", "extip:172.172.172.4"]
+        command: [
+          "--netrestrict", "172.172.172.0/28",
+          "--nat", "extip:172.172.172.4"
+        ]
+        volumes:
+            - ./${BOOTNODE_KEY}:/bootnode.key
         networks:
             geth-net:
                 ipv4_address: 172.172.172.4
@@ -30,15 +35,25 @@ services:
 
     geth-sealingnode:
         container_name: geth-sealingnode
-        image: sealingnode:latest
+        image: gethnode:latest
         command: [
-          "--unlock",
-          "${SEALER_ACCOUNT}",
-          "--netrestrict", "172.172.172.0/28",
+          "--unlock", "${SEALER_ACCOUNT}",
+          "--password", "${SEALER_PASSWORD}",
+          "--mine",
           "--networkid", "${CHAIN_ID}",
-          "--nat", "extip:172.172.172.2", "--bootnodes", "enode://${BOOTNODE_ENODE}@172.172.172.4:0?discport=30301", "--password", "password.txt"]
+          "--datadir", "/.ethereum",
+          "--bootnodes", "enode://${BOOTNODE_ENODE}@172.172.172.4:0?discport=30301",
+          "--netrestrict", "172.172.172.0/28",
+          "--nat", "extip:172.172.172.2",
+          "--ipcdisable",
+          "--txpool.lifetime", "12s",
+          "--txpool.pricebump", "5"
+        ]
         volumes:
             - /.ethereum/
+            - ./${GENESIS_FILE}:/${GENESIS_FILE}
+            - ./${SEALER_KEYSTORE}:/.ethereum/${SEALER_KEYSTORE}
+            - ./${SEALER_PASSWORD}:/${SEALER_PASSWORD}
         depends_on:
             - geth-bootnode
         networks:
@@ -48,10 +63,25 @@ services:
 
     geth-rpcnode:
         container_name: geth-rpcnode
-        image: rpcnode:latest
-        command: ["--netrestrict", "172.172.172.0/28", "--networkid", "${CHAIN_ID}", "--nat", "extip:172.172.172.3", "--bootnodes", "enode://${BOOTNODE_ENODE}@172.172.172.4:0?discport=30301"]
+        image: gethnode:latest
+        command: [
+          "--networkid", "${CHAIN_ID}",
+          "--datadir", "/.ethereum",
+          "--http",
+          "--http.api", "eth,net,rpc,web3,txpool",
+          "--http.addr", "0.0.0.0",
+          "--http.vhosts", "*",
+          "--http.corsdomain", "*",
+          "--bootnodes", "enode://${BOOTNODE_ENODE}@172.172.172.4:0?discport=30301",
+          "--netrestrict", "172.172.172.0/28",
+          "--nat", "extip:172.172.172.3",
+          "--gcmode", "archive",
+          "--txpool.lifetime", "12s",
+          "--txpool.pricebump", "5"
+        ]
         volumes:
             - /.ethereum/
+            - ./${GENESIS_FILE}:/${GENESIS_FILE}
         depends_on:
             - geth-bootnode
         ports:
