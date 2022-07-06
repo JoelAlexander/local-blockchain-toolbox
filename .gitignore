@@ -4,5 +4,5 @@
 *.txt
 *.tar.gz
 keystore**
-geth**
+geth-alltools**
 nvm_install.sh

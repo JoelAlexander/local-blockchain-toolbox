@@ -5,7 +5,7 @@ services:
     #     container_name: nginx
     #     image: nginx:stable
     #     depends_on:
-    #         - geth-rpcnode
+    #         - rpcnode
     #     ports:
     #         - 80:80
     #         - 443:443
@@ -16,11 +16,11 @@ services:
     #         - /home/ubuntu/hyphen/dist:/var/www:ro
     #     networks:
     #         - default
-    #         - geth-net
+    #         - eth-net
     #     restart: unless-stopped
 
-    geth-bootnode:
-        container_name: geth-bootnode
+    bootnode:
+        container_name: bootnode
         image: bootnode:latest
         command: [
           "--netrestrict", "172.172.172.0/28",
@@ -29,12 +29,12 @@ services:
         volumes:
             - ./${BOOTNODE_KEY}:/bootnode.key
         networks:
-            geth-net:
+            eth-net:
                 ipv4_address: 172.172.172.4
         restart: unless-stopped
 
-    geth-sealingnode:
-        container_name: geth-sealingnode
+    sealingnode:
+        container_name: sealingnode
         image: gethnode:latest
         command: [
           "--unlock", "${SEALER_ACCOUNT}",
@@ -55,14 +55,14 @@ services:
             - ./${SEALER_KEYSTORE}:/.ethereum/${SEALER_KEYSTORE}
             - ./${SEALER_PASSWORD}:/${SEALER_PASSWORD}
         depends_on:
-            - geth-bootnode
+            - bootnode
         networks:
-            geth-net:
+            eth-net:
                 ipv4_address: 172.172.172.2
         restart: unless-stopped
 
-    geth-rpcnode:
-        container_name: geth-rpcnode
+    rpcnode:
+        container_name: rpcnode
         image: gethnode:latest
         command: [
           "--networkid", "${CHAIN_ID}",
@@ -83,16 +83,16 @@ services:
             - /.ethereum/
             - ./${GENESIS_FILE}:/${GENESIS_FILE}
         depends_on:
-            - geth-bootnode
+            - bootnode
         ports:
             - 8545:8545
         networks:
-            geth-net:
+            eth-net:
                 ipv4_address: 172.172.172.3
         restart: unless-stopped
 
 networks:
-    geth-net:
+    eth-net:
         driver: bridge
         ipam:
             config:
