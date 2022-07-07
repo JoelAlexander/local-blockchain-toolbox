@@ -1,47 +1,35 @@
 #!/bin/bash
 
-# TODO: Make this script less chatty, and only touching things if it needs to.
+wirelessInterface=$(./connect-wireless-interface.sh)
+macAddress=$(nmcli dev show $wirelessInterface | awk '/GENERAL.HWADDR/ { print $2 }')
+gateway=$(nmcli dev show $wirelessInterface | awk '/IP4.GATEWAY/ { print $2 }')
+ipAddress=$(nmcli dev show $wirelessInterface | awk '/IP4.ADDRESS/ { print $2 }' | sed -e 's/\/.*//')
 
-# TODO: Check if connected to ethernet...rare but obvious failure mode?
-sudo apt update
-sudo apt install -y \
-  net-tools \
-  wireless-tools \
-  network-manager \
-  ca-certificates \
-  curl \
-  gnupg \
-  lsb-release\
-  certbot\
-  docker-ce\
-  docker-ce-cli\
-  containerd.io\
-  docker-compose-plugin\
+echo "Before proceding: "
+echo "Access the admin panel on your router: http://$gateway"
+echo "Give $macAddress a static IP of $ipAddress"
 
-# TODO: Check if nvm / node is already installed
-curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.39.1/install.sh > nvm.sh && chmod +x nvm.sh && ./nvm.sh && rm nvm.sh
+domain=$([ -f .env ] && awk -F'=' '/^DOMAIN/ { print $2 }' .env | head -1)
+if [ -z "$domain" ]; then
+  read -p "Enter your domain: " domain
+  sudo certbot certonly --manual --preferred-challenges=dns -d "*.$domain" --register-unsafely-without-email
+  echo "DOMAIN=$domain" >> .env
+fi
 
-# TODO: The following command could be extracted and used from the nvm install output
-export NVM_DIR="$HOME/.nvm"
-[ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh"  # This loads nvm
-[ -s "$NVM_DIR/bash_completion" ] && \. "$NVM_DIR/bash_completion"  # This loads nvm bash_completion
+certs="/etc/letsencrypt/live/$domain"
+fullchain=$([ -f .env ] && awk -F'=' '/^CERT_FULLCHAIN/ { print $2 }' .env | head -1)
+privkey=$([ -f .env ] && awk -F'=' '/^CERT_PRIVKEY/ { print $2 }' .env | head -1)
+if [ -z "$fullchain" ] && [ -z "$privkey" ]; then
 
-# TODO: Check if node / ethers is already installed
-nvm install 16 && nvm use 16
-npm install ethers
+  if sudo test ! -f "$certs/fullchain.pem" && sudo test ! -f "$certs/privkey.pem"
+  then
+    echo "SSL certificates for $domain not found"
+  fi
 
-sudo systemctl start NetworkManager.service
-sudo systemctl enable NetworkManager.service
+  fullchain=$(sudo readlink -f "$certs/fullchain.pem")
+  privkey=$(sudo readlink -f "$certs/privkey.pem")
+  echo "CERT_FULLCHAIN=$fullchain" >> .env
+  echo "CERT_PRIVKEY=$privkey" >> .env
+fi
 
-# Install and setup Docker
-sudo mkdir -p /etc/apt/keyrings
-curl -fsSL https://download.docker.com/linux/ubuntu/gpg | sudo gpg --yes --dearmor -o /etc/apt/keyrings/docker.gpg
-echo \
- "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.gpg] https://download.docker.com/linux/ubuntu \
- $(lsb_release -cs) stable" | sudo tee /etc/apt/sources.list.d/docker.list > /dev/null
-sudo groupadd -f docker
-# TODO: test again
-sudo usermod -aG docker $USER
-newgrp docker
-
-source setup2.sh
+cat nginx.conf.template | sed "s/{{DOMAIN}}/$domain/" > nginx.conf

@@ -15,30 +15,19 @@ Need some way to remove all files including .env before running setup.
 scp local-blockchain-node.tar.gz ubuntu@joelalexander.me:~/. && ssh ubuntu@joelalexander.me 'tar -xvzf local-blockchain-node.tar.gz && source ./setup.sh'
 
 
+Procedure:
+0. ssh into host and get the tar.gz (What is ip/hostname?, where to get tar.gz)
+1. ./install.sh
+2. newgrp docker
+3. ./make-docker-images.sh
 
-Things done on new host:
-- Set initial password with passwd
-- ssh nixos@nixos
-- sudo -i
+Split network setup from blockchain setup?
 
-Add the nixos hardware channel for better harware support
-- nix-channel --add https://github.com/NixOS/nixos-hardware/archive/master.tar.gz nixos-hardware
-- nix-channel --update
+4. ./create-local-blockchain.sh
 
-Generate the initial config.
-- nixos-generate-config
+Split blockchain setup from site setup?
 
-Get a password hash
-- nix-shell -p mkpasswd
-- mkpasswd -m sha-512
-- exit
-
-Build a configuration
-- vim /etc/nixos/configuration.nix
-1. Add "<nixos/hardware/raspberry-pi/4>"" to imports
-2. Enable ssh
-3. nixos user with password created in previous step:
-
+5. ./run-local-blockchain.sh
 
 
 
