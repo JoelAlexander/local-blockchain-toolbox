@@ -8,11 +8,6 @@ You may need to reformat the SD card using fdisk to have a single Linux partitio
 
 sudo dd if=~/Downloads/nixos-sd-image-20.09.4409.66b0db71f46-aarch64-linux.img of=/dev/mmcblk0 status=progress
 
-Once booted from SD card:
-
-Need some way to remove all files including .env before running setup.
-
-scp local-blockchain-node.tar.gz ubuntu@joelalexander.me:~/. && ssh ubuntu@joelalexander.me 'tar -xvzf local-blockchain-node.tar.gz && source ./setup.sh'
 
 
 Procedure:

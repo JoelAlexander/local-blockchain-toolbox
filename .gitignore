@@ -6,3 +6,4 @@
 keystore**
 geth-alltools**
 nvm_install.sh
+*.conf

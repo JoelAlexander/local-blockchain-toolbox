@@ -1,9 +1,11 @@
 #!/bin/bash
 
-./connect-wireless-interface.sh > /dev/null
-# TODO: Make this script less chatty, and only touching things if it needs to.
+scriptPath=$(dirname $(realpath $0))
+localBlockchainPath=$($scriptPath/get-blockchain-directory.sh)
 
-# TODO: Check if connected to ethernet...rare but obvious failure mode?
+$scriptPath/connect-wireless-interface.sh
+
+# TODO: Make this script less chatty, and only touching things if it needs to.
 sudo apt update
 sudo apt install -y \
   net-tools \
@@ -18,6 +20,7 @@ sudo apt install -y \
   docker-ce-cli\
   containerd.io\
   docker-compose-plugin\
+  git
 
 # TODO: Check if nvm / node is already installed
 curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.39.1/install.sh > nvm.sh && chmod +x nvm.sh && ./nvm.sh && rm nvm.sh
@@ -34,7 +37,7 @@ npm install ethers
 sudo systemctl start NetworkManager.service
 sudo systemctl enable NetworkManager.service
 
-./install-geth.sh
+$scriptPath/install-geth.sh
 
 # Install and setup Docker
 sudo mkdir -p /etc/apt/keyrings
@@ -44,5 +47,5 @@ echo \
  $(lsb_release -cs) stable" | sudo tee /etc/apt/sources.list.d/docker.list > /dev/null
 sudo groupadd -f docker
 sudo usermod -aG docker $USER
-echo "Run: 'newgrp docker' or log out then in to complete installation."
-echo "Then, run './build-blockchain-images.sh'"
+echo "Run: 'newgrp docker' to complete installation."
+echo "Then, run '$scriptPath/build-blockchain-images.sh'"
