@@ -1,0 +1,16 @@
+{
+  "name": "local-blockchain-node",
+  "version": "1.0.0",
+  "scripts": {
+    "contracts": "hardhat compile",
+    "deploy": "hardhat run --network local deploy.js"
+  },
+  "devDependencies": {
+    "@ensdomains/ens-contracts": "^0.0.11",
+    "eth-ens-namehash": "^2.0.8",
+    "@nomiclabs/hardhat-ethers": "^2.1.0",
+    "@openzeppelin/contracts": "^4.7.2",
+    "hardhat": "^2.10.1",
+    "ethers": "^5.6.0"
+  }
+}

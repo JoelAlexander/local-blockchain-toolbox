@@ -3,9 +3,8 @@
 scriptPath=$(dirname $(realpath $0))
 cd $($scriptPath/get-blockchain-directory.sh)
 
-docker compose down
+cd ~/.local-blockchain
+docker compose stop
 docker compose rm -v
-docker container prune
-docker volume prune
-docker network prune
-rm -rf .env bootnode.key password.txt genesis.json keystore nginx.conf docker-comopse.yml entrypoint.sh
+rm -rf .env deploy.js hardhat.config.json node_modules contracts cache artifacts hardhat.config.js package.json package-lock.json creator.json environment.json bootnode.key password.txt genesis.json keystore nginx.conf entrypoint.sh docker-compose.yml
+cd ~

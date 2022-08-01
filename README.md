@@ -8,7 +8,14 @@ You may need to reformat the SD card using fdisk to have a single Linux partitio
 
 sudo dd if=~/Downloads/nixos-sd-image-20.09.4409.66b0db71f46-aarch64-linux.img of=/dev/mmcblk0 status=progress
 
-
+Remote script for:
+0. With rpi off, put ubuntu on the SD card and put it in the rpi
+1. Connect router and RPI with ethernet cable
+2. Turn on rpi
+3. ssh-keygen -f "/home/joel/.ssh/known_hosts" -R "ubuntu"
+3. Identify ip address of rpi on router admin panel
+4. ssh ubuntu@ipAddress password:ubuntu and set password
+5. ./remote/install.sh 192.168.86.9
 
 Procedure:
 0. ssh into host and get the tar.gz (What is ip/hostname?, where to get tar.gz)

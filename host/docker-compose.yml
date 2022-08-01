@@ -13,7 +13,7 @@ services:
             - ./nginx.conf:/etc/nginx/conf.d/default.conf:ro
             - ${CERT_FULLCHAIN}:/etc/ssl/certs/${DOMAIN}/fullchain.pem:ro
             - ${CERT_PRIVKEY}:/etc/ssl/certs/${DOMAIN}/privkey.pem:ro
-            # - /home/ubuntu/hyphen/dist:/var/www:ro
+            - ${HYPHEN_PATH}/dist:/var/www:ro
         networks:
             - default
             - eth-net

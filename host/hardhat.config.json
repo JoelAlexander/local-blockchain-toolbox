@@ -1,0 +1,19 @@
+{
+  "solidity": {
+    "version": "0.8.4",
+    "settings": {
+      "optimizer": {
+        "enabled": true,
+        "runs": 200,
+        "details": {
+          "yul": false
+        }
+      }
+    }
+  },
+  "paths": {
+    "sources": "./contracts",
+    "cache": "./cache",
+    "artifacts": "./artifacts"
+  }
+}

@@ -16,7 +16,7 @@ server {
     listen 443 http2 ssl;
     listen [::]:443 http2 ssl;
 
-    server_name hyphen.{{DOMAIN}};
+    server_name {{DOMAIN}};
 
     ssl_certificate /etc/ssl/certs/{{DOMAIN}}/fullchain.pem;
     ssl_certificate_key /etc/ssl/certs/{{DOMAIN}}/privkey.pem;
