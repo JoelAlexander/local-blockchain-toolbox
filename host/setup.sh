@@ -157,6 +157,9 @@ cp $scriptPath/hardhat.config.js $localBlockchainPath
 cp $scriptPath/docker-compose.yml $localBlockchainPath
 cp $scriptPath/entrypoint.sh $localBlockchainPath
 cp $scriptPath/deploy.js $localBlockchainPath
+cp $scriptPath/deployModule.js $localBlockchainPath
+cp $scriptPath/ensUtils.js $localBlockchainPath
+cp $scriptPath/utils.js $localBlockchainPath
 
 # Create the .env file needed by dockerfile
 touch $localBlockchainPath/.env
@@ -214,6 +217,7 @@ jq --arg creatorPrivateKey $creatorPrivateKey\
 npm install
 npm run contracts
 npm run deploy
+npm run deployModule
 cd $current
 
 # echo "Deploying ENS."
