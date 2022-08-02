@@ -24,12 +24,6 @@ async function deploy() {
   } else {
     console.log(`ENS already deployed to ${environment.ensAddress}`)
   }
-
-  if (!hardhatConfig.networks.local.ensAddress) {
-    console.log('Updating hardhat config with ensAddress')
-    hardhatConfig.networks.local.ensAddress = environment.ensAddress
-    fs.writeFileSync(path.join(__dirname, 'hardhat.config.json'), JSON.stringify(hardhatConfig, null, 2))
-  }
 }
 
 deploy()
