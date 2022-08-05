@@ -1,3 +1,4 @@
+const ethers = require('ethers')
 const path = require('node:path')
 const fs = require('fs')
 const environment = require('./../environment.json')
@@ -15,7 +16,8 @@ const configuration = {
 
 const handleConfigurationEntry = (key) => {
   const value = manifest.configure[key]
-  if ( === "random-private-key") {
+  if (value === "random-private-key") {
+    console.log(`Handling ${key}, ${value}`)
     configuration[key] = ethers.Wallet.createRandom().privateKey
   } else {
     console.error(`Unsupported config: ${value}`)
@@ -23,9 +25,11 @@ const handleConfigurationEntry = (key) => {
 }
 
 if (manifest.configure) {
-  manifest.configure.keys().forEach((item, i) => {
+  Object.keys(manifest.configure).forEach((item, i) => {
     handleConfigurationEntry(item)
   });
 }
 
-fs.writeFileSync(path.join(modulePath, "blockchain.config"), JSON.stringify(configuration, null, 2))
+console.log(JSON.stringify(configuration))
+
+fs.writeFileSync(path.join(modulePath, "configuration.json"), JSON.stringify(configuration, null, 2))

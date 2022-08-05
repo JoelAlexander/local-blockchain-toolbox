@@ -4,6 +4,9 @@ gethName=$($scriptPath/install-geth.sh)
 geth="$scriptPath/$gethName/geth"
 bootnode="$scriptPath/$gethName/bootnode"
 
+source $NVM_DIR/nvm.sh
+nvm use 16
+
 # Lazily create empty environment file if it doesn't exist already
 environmentFile="$scriptPath/environment.json"
 if [ ! -f $environmentFile ]
@@ -192,16 +195,16 @@ jq --arg blockchainUrl $blockchainUrl '.blockchainUrl |= $blockchainUrl'\
   $environmentFile | sponge $environmentFile
 
 creatorPrivateKey=$(jq -r '.privateKey' $scriptPath/$creatorFile)
-jq --arg creatorPrivateKey $creatorPrivateKey\
+jq --null-input\
+  --arg creatorPrivateKey $creatorPrivateKey\
   --argjson chainId $chainId\
   --arg blockchainUrl $blockchainUrl\
-  '.defaultNetwork |= "local" | .networks.local |= { "chainId": $chainId, "url": $blockchainUrl, "accounts": [ $creatorPrivateKey ]}'\
-  "$scriptPath/hardhat.config.json" | sponge $scriptPath/hardhat.config.json
+  '{ "chainId": $chainId, "url": $blockchainUrl, "accounts": [ $creatorPrivateKey ]}' | sponge $scriptPath/network.json
 
 echo "Blockchain online."
 
 echo "Compiling contracts."
 npm install
 npm run contracts
-npm run deploy
+npm run deployGenesis
 # npm run deployModule

@@ -6,3 +6,11 @@ keystore**
 geth-alltools**
 nvm_install.sh
 *.conf
+node_modules
+package-lock.json
+environment.json
+artifacts
+cache
+creator.json
+genesis.json
+network.json

@@ -3,16 +3,17 @@
   "version": "1.0.0",
   "scripts": {
     "contracts": "hardhat compile",
-    "deploy": "hardhat run --network local scripts/deploy.js",
+    "deployGenesis": "hardhat run --network local scripts/deployGenesis.js",
     "configureModule": "node scripts/configureModule.js",
     "deployModule": "hardhat run --network local scripts/deployModule.js"
   },
   "devDependencies": {
     "@ensdomains/ens-contracts": "^0.0.11",
-    "eth-ens-namehash": "^2.0.8",
     "@nomiclabs/hardhat-ethers": "^2.1.0",
     "@openzeppelin/contracts": "^4.7.2",
-    "hardhat": "^2.10.1",
-    "ethers": "^5.6.0"
+    "ethereumjs-util": "^7.1.5",
+    "eth-ens-namehash": "^2.0.8",
+    "ethers": "^5.6.9",
+    "hardhat": "^2.10.1"
   }
 }

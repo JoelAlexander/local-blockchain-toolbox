@@ -41,7 +41,6 @@ $scriptPath/install-geth.sh
 
 # TODO: Check if node / ethers is already installed
 nvm install 16
-npm install ethers ethereumjs-util
 
 sudo systemctl enable NetworkManager.service
 sudo systemctl start NetworkManager.service
