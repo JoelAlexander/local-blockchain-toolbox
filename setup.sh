@@ -1,12 +1,11 @@
 #!/bin/bash
 scriptPath=$(dirname $(realpath $0))
-localBlockchainPath=$($scriptPath/get-blockchain-directory.sh)
 gethName=$($scriptPath/install-geth.sh)
-geth="$localBlockchainPath/$gethName/geth"
-bootnode="$localBlockchainPath/$gethName/bootnode"
+geth="$scriptPath/$gethName/geth"
+bootnode="$scriptPath/$gethName/bootnode"
 
 # Lazily create empty environment file if it doesn't exist already
-environmentFile="$localBlockchainPath/environment.json"
+environmentFile="$scriptPath/environment.json"
 if [ ! -f $environmentFile ]
 then
   echo '{}' > $environmentFile
@@ -86,7 +85,7 @@ if [ "$bootnodeKey" = 'null' ] && [ "$bootnodeEnode" = 'null' ]
 then
   echo "Creating new bootnode."
   bootnodeKey=bootnode.key
-  bootnodeEnode=$($bootnode -genkey $localBlockchainPath/bootnode.key -writeaddress)
+  bootnodeEnode=$($bootnode -genkey $scriptPath/bootnode.key -writeaddress)
   jq --arg bootnodeKey $bootnodeKey\
     --arg bootnodeEnode $bootnodeEnode\
     '.bootnodeKey |= $bootnodeKey | .bootnodeEnode |= $bootnodeEnode'\
@@ -103,7 +102,7 @@ then
   echo -n "Enter a password for the new sealing account: "
   read password
   sealerPassword=password.txt
-  echo $password > $localBlockchainPath/$sealerPassword
+  echo $password > $scriptPath/$sealerPassword
   jq --arg sealerPassword $sealerPassword\
     '.sealerPassword |= $sealerPassword'\
     $environmentFile | sponge $environmentFile
@@ -128,16 +127,16 @@ if [ "$genesisFile" = 'null' ]
 then
 
   # TODO: All of the cases where we have a genesis file but we aren't a sealer
-  newAccountOutput=$($geth account new --password "$localBlockchainPath/$sealerPassword" --datadir $localBlockchainPath)
+  newAccountOutput=$($geth account new --password "$scriptPath/$sealerPassword" --datadir $scriptPath)
   sealerAccount=$(echo $newAccountOutput | awk '{ print $11 }')
-  sealerKeystore=$(realpath --relative-to=$localBlockchainPath $(echo $newAccountOutput | awk '{ print $18 }'))
+  sealerKeystore=$(realpath --relative-to=$scriptPath $(echo $newAccountOutput | awk '{ print $18 }'))
 
   echo -n "Enter a chain ID for the blockchain genesis: "
   read chainId
   genesisFile=genesis.json
   creatorFile=creator.json
 
-  node $scriptPath/make-genesis.js $chainId $sealerAccount "$localBlockchainPath/$genesisFile" "$localBlockchainPath/$creatorFile"
+  node $scriptPath/make-genesis.js $chainId $sealerAccount "$scriptPath/$genesisFile" "$scriptPath/$creatorFile"
 
   jq --argjson chainId $chainId\
     --arg sealerAccount $sealerAccount\
@@ -148,46 +147,37 @@ then
     $environmentFile | sponge $environmentFile
 fi
 
-cat $scriptPath/nginx.conf.template | sed -e "s/{{DOMAIN}}/$domain/" > $localBlockchainPath/nginx.conf
-
-# Copy needed files
-mkdir -p $localBlockchainPath/contracts $localBlockchainPath/scripts
-cp -r $scriptPath/contracts/* $localBlockchainPath/contracts
-cp -r $scriptPath/scripts/* $localBlockchainPath/scripts
-cp $scriptPath/package.json $localBlockchainPath
-cp $scriptPath/hardhat.config.js $localBlockchainPath
-cp $scriptPath/docker-compose.yml $localBlockchainPath
-cp $scriptPath/entrypoint.sh $localBlockchainPath
+cat $scriptPath/nginx.conf.template | sed -e "s/{{DOMAIN}}/$domain/" > $scriptPath/nginx.conf
 
 # Create the .env file needed by dockerfile
-touch $localBlockchainPath/.env
-echo "CERT_FULLCHAIN=$(jq '.fullchain' $environmentFile)" > $localBlockchainPath/.env
-echo "CERT_PRIVKEY=$(jq '.privkey' $environmentFile)" >> $localBlockchainPath/.env
-echo "HYPHEN_PATH=$(jq '.hyphenPath' $environmentFile)" >> $localBlockchainPath/.env
-echo "BOOTNODE_KEY=$(jq '.bootnodeKey' $environmentFile)" >> $localBlockchainPath/.env
-echo "BOOTNODE_ENODE=$(jq '.bootnodeEnode' $environmentFile)" >> $localBlockchainPath/.env
-echo "CHAIN_ID=$(jq '.chainId' $environmentFile)" >> $localBlockchainPath/.env
-echo "SEALER_ACCOUNT=$(jq '.sealerAccount' $environmentFile)" >> $localBlockchainPath/.env
-echo "SEALER_KEYSTORE=$(jq '.sealerKeystore' $environmentFile)" >> $localBlockchainPath/.env
-echo "SEALER_PASSWORD=$(jq '.sealerPassword' $environmentFile)" >> $localBlockchainPath/.env
-echo "GENESIS_FILE=$(jq '.genesisFile' $environmentFile)" >> $localBlockchainPath/.env
-echo "DOMAIN=$(jq '.domain' $environmentFile)" >> $localBlockchainPath/.env
+touch $scriptPath/.env
+echo "CERT_FULLCHAIN=$(jq '.fullchain' $environmentFile)" > $scriptPath/.env
+echo "CERT_PRIVKEY=$(jq '.privkey' $environmentFile)" >> $scriptPath/.env
+echo "HYPHEN_PATH=$(jq '.hyphenPath' $environmentFile)" >> $scriptPath/.env
+echo "BOOTNODE_KEY=$(jq '.bootnodeKey' $environmentFile)" >> $scriptPath/.env
+echo "BOOTNODE_ENODE=$(jq '.bootnodeEnode' $environmentFile)" >> $scriptPath/.env
+echo "CHAIN_ID=$(jq '.chainId' $environmentFile)" >> $scriptPath/.env
+echo "SEALER_ACCOUNT=$(jq '.sealerAccount' $environmentFile)" >> $scriptPath/.env
+echo "SEALER_KEYSTORE=$(jq '.sealerKeystore' $environmentFile)" >> $scriptPath/.env
+echo "SEALER_PASSWORD=$(jq '.sealerPassword' $environmentFile)" >> $scriptPath/.env
+echo "GENESIS_FILE=$(jq '.genesisFile' $environmentFile)" >> $scriptPath/.env
+echo "DOMAIN=$(jq '.domain' $environmentFile)" >> $scriptPath/.env
 
 if [ -z $"$(docker image ls bootnode | awk '/^bootnode/ { print }')" ]
 then
   docker build -f $scriptPath/bootnode/Dockerfile -t bootnode:latest\
     --build-arg GETH_BIN=$gethName\
-    $localBlockchainPath
+    $scriptPath
 fi
 
 if [ -z $"$(docker image ls gethnode | awk '/^gethnode/ { print }')" ]
 then
   docker build -f $scriptPath/gethnode/Dockerfile -t gethnode:latest\
     --build-arg GETH_BIN=$gethName\
-    $localBlockchainPath
+    $scriptPath
 fi
 
-docker compose -f $localBlockchainPath/docker-compose.yml up -d
+docker compose -f $scriptPath/docker-compose.yml up -d
 
 blockchainUrl="https://blockchain.$domain/"
 status=$(curl $blockchainUrl)
@@ -201,19 +191,17 @@ done
 jq --arg blockchainUrl $blockchainUrl '.blockchainUrl |= $blockchainUrl'\
   $environmentFile | sponge $environmentFile
 
-echo "Blockchain online."
-
-echo "Compiling contracts."
-current=$(pwd)
-cd $localBlockchainPath
-creatorPrivateKey=$(jq -r '.privateKey' $localBlockchainPath/$creatorFile)
+creatorPrivateKey=$(jq -r '.privateKey' $scriptPath/$creatorFile)
 jq --arg creatorPrivateKey $creatorPrivateKey\
   --argjson chainId $chainId\
   --arg blockchainUrl $blockchainUrl\
   '.defaultNetwork |= "local" | .networks.local |= { "chainId": $chainId, "url": $blockchainUrl, "accounts": [ $creatorPrivateKey ]}'\
-  "$scriptPath/hardhat.config.json" | sponge $localBlockchainPath/hardhat.config.json
+  "$scriptPath/hardhat.config.json" | sponge $scriptPath/hardhat.config.json
+
+echo "Blockchain online."
+
+echo "Compiling contracts."
 npm install
 npm run contracts
 npm run deploy
-npm run deployModule
-cd $current
+# npm run deployModule

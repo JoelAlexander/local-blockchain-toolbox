@@ -1,7 +1,6 @@
 #!/bin/bash
 
 scriptPath=$(dirname $(realpath $0))
-localBlockchainPath=$($scriptPath/get-blockchain-directory.sh)
 
 # TODO: Make this script less chatty, and only touching things if it needs to.
 sudo mkdir -p /etc/apt/keyrings

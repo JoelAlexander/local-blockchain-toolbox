@@ -1,7 +1,6 @@
 #!/bin/bash
 
 scriptPath=$(dirname $(realpath $0))
-localBlockchainPath=$($scriptPath/get-blockchain-directory.sh)
 
 # TODO: Assumes linux
 machine=$(uname -m)
@@ -19,10 +18,10 @@ fi
 gethName="geth-alltools-linux-${variant}-1.10.19-23bee162"
 gethPackage="$gethName.tar.gz"
 gethDownload="https://gethstore.blob.core.windows.net/builds/$gethPackage"
-gethPath="$localBlockchainPath/$gethName"
-gethPackagePath="$localBlockchainPath/$gethPackage"
+gethPath="$scriptPath/$gethName"
+gethPackagePath="$scriptPath/$gethPackage"
 if [[ ! -d $gethPath || ! -f $gethPackagePath ]]; then
-  curl $gethDownload --output $gethPackagePath && tar -xzf $gethPackagePath --directory $localBlockchainPath
+  curl $gethDownload --output $gethPackagePath && tar -xzf $gethPackagePath --directory $scriptPath
 fi
 
 echo $gethName
