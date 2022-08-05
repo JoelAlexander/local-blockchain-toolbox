@@ -1,5 +1,3 @@
-const environment = require('./environment.json')
-
 function getSigner() {
   return ethers.getSigners().then((signers) => { return signers[0] })
 }

@@ -3,8 +3,9 @@
   "version": "1.0.0",
   "scripts": {
     "contracts": "hardhat compile",
-    "deploy": "hardhat run --network local deploy.js",
-    "deployModule": "hardhat run --network local deployModule.js"
+    "deploy": "hardhat run --network local scripts/deploy.js",
+    "configureModule": "node scripts/configureModule.js",
+    "deployModule": "hardhat run --network local scripts/deployModule.js"
   },
   "devDependencies": {
     "@ensdomains/ens-contracts": "^0.0.11",

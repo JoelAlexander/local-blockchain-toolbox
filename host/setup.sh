@@ -151,15 +151,13 @@ fi
 cat $scriptPath/nginx.conf.template | sed -e "s/{{DOMAIN}}/$domain/" > $localBlockchainPath/nginx.conf
 
 # Copy needed files
-cp -R $scriptPath/contracts $localBlockchainPath/contracts
+mkdir -p $localBlockchainPath/contracts $localBlockchainPath/scripts
+cp -r $scriptPath/contracts/* $localBlockchainPath/contracts
+cp -r $scriptPath/scripts/* $localBlockchainPath/scripts
 cp $scriptPath/package.json $localBlockchainPath
 cp $scriptPath/hardhat.config.js $localBlockchainPath
 cp $scriptPath/docker-compose.yml $localBlockchainPath
 cp $scriptPath/entrypoint.sh $localBlockchainPath
-cp $scriptPath/deploy.js $localBlockchainPath
-cp $scriptPath/deployModule.js $localBlockchainPath
-cp $scriptPath/ensUtils.js $localBlockchainPath
-cp $scriptPath/utils.js $localBlockchainPath
 
 # Create the .env file needed by dockerfile
 touch $localBlockchainPath/.env
@@ -213,18 +211,9 @@ jq --arg creatorPrivateKey $creatorPrivateKey\
   --argjson chainId $chainId\
   --arg blockchainUrl $blockchainUrl\
   '.defaultNetwork |= "local" | .networks.local |= { "chainId": $chainId, "url": $blockchainUrl, "accounts": [ $creatorPrivateKey ]}'\
-  $scriptPath/hardhat.config.json | sponge $localBlockchainPath/hardhat.config.json
+  "$scriptPath/hardhat.config.json" | sponge $localBlockchainPath/hardhat.config.json
 npm install
 npm run contracts
 npm run deploy
 npm run deployModule
 cd $current
-
-# echo "Deploying ENS."
-# node $scriptPath/deploy.js $localBlockchainPath/$creatorFile $environmentFile $hyphenPath/artifacts
-
-# echo "node $scriptPath/deploy.js $localBlockchainPath/$deploymentTransactionsFile https://blockchain.$domain $chainId"
-# node $scriptPath/deploy.js\
-#   "$localBlockchainPath/$deploymentTransactionsFile"\
-#   "https://blockchain.$domain/"\
-#   $chainId
