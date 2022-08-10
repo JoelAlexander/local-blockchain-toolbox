@@ -28,10 +28,14 @@ contract ENSDeployment {
     ens.setResolver(resolverNode, address(publicResolver));
     publicResolver.setAddr(resolverNode, address(publicResolver));
 
-    // Calling addresses have full control over thier own reverse records.
+    bytes32 reverseNode = topLevelNode(REVERSE_REGISTRAR_LABEL);
+    bytes32 reverseAddressNode = namehash(reverseNode, ADDR_LABEL);
     ReverseRegistrar reverseRegistrar = new ReverseRegistrar(ens, NameResolver(address(publicResolver)));
     ens.setSubnodeOwner(bytes32(0), REVERSE_REGISTRAR_LABEL, address(this));
-    ens.setSubnodeOwner(topLevelNode(REVERSE_REGISTRAR_LABEL), ADDR_LABEL, address(reverseRegistrar));
+    ens.setSubnodeOwner(reverseNode, ADDR_LABEL, address(this));
+    ens.setResolver(reverseAddressNode, address(publicResolver));
+    publicResolver.setAddr(reverseAddressNode, address(reverseRegistrar));
+    ens.setSubnodeOwner(reverseNode, ADDR_LABEL, address(reverseRegistrar));
 
     // Give the caller control over the rest of the namespace.
     ens.setOwner(bytes32(0), msg.sender);

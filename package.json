@@ -3,7 +3,7 @@
   "version": "1.0.0",
   "scripts": {
     "contracts": "hardhat compile",
-    "deployGenesis": "hardhat run --network local scripts/deployGenesis.js",
+    "makeGenesis": "node scripts/makeGenesis.js",
     "configureModule": "node scripts/configureModule.js",
     "deployModule": "hardhat run --network local scripts/deployModule.js"
   },

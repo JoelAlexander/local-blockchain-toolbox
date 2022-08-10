@@ -5,7 +5,9 @@ geth="$scriptPath/$gethName/geth"
 bootnode="$scriptPath/$gethName/bootnode"
 
 source $NVM_DIR/nvm.sh
-nvm use 16
+
+echo "Installing npm dependencies"
+npm install
 
 # Lazily create empty environment file if it doesn't exist already
 environmentFile="$scriptPath/environment.json"
@@ -139,7 +141,7 @@ then
   genesisFile=genesis.json
   creatorFile=creator.json
 
-  node $scriptPath/make-genesis.js $chainId $sealerAccount "$scriptPath/$genesisFile" "$scriptPath/$creatorFile"
+  npx hardhat makeGenesis --chain-id $chainId --sealer-address $sealerAccount --genesis-file $genesisFile --creator-file $creatorFile
 
   jq --argjson chainId $chainId\
     --arg sealerAccount $sealerAccount\
@@ -202,9 +204,15 @@ jq --null-input\
   '{ "chainId": $chainId, "url": $blockchainUrl, "accounts": [ $creatorPrivateKey ]}' | sponge $scriptPath/network.json
 
 echo "Blockchain online."
-
-echo "Compiling contracts."
-npm install
+echo "Compiling contracts"
 npm run contracts
-npm run deployGenesis
+# echo "Deploying genesis contracts"
+# npm run deployGenesis
+#
+# npm run configureModule ~/hyphen
+#
+# cd ~/hyphen
+# npm install
+# npm run contracts
+# npm run build
 # npm run deployModule

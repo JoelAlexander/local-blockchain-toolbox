@@ -39,8 +39,7 @@ export NVM_DIR="$HOME/.nvm"
 
 $scriptPath/install-geth.sh
 
-# TODO: Check if node / ethers is already installed
-nvm install 16
+nvm install 16 && nvm use 16
 
 sudo systemctl enable NetworkManager.service
 sudo systemctl start NetworkManager.service

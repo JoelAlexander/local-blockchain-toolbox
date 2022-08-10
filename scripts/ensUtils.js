@@ -51,6 +51,16 @@ async function claimSubnode(node, label) {
   return setSubnodeOwner(node, label, signer.address)
 }
 
+async function claimSubnodeAndSetAddr(node, label, subnode, addr) {
+  return claimSubnode(node, label).then((receipt) => {
+    console.log(`Setting resolver to the public resolver`)
+    return setPublicResolver(subnode).then((receipt) => {
+      console.log(`Setting address to ${addr}`)
+      return setPublicResolverAddr(subnode, addr)
+    })
+  })
+}
+
 function leafLabelAndNode(name) {
   const names = name.split('.')
   if (names.lenth === 0) {
@@ -95,8 +105,10 @@ module.exports.getEnsRegistry = getEnsRegistry
 module.exports.getPublicResolver = getPublicResolver
 module.exports.getEnsProvider = getEnsProvider
 module.exports.claimSubnode = claimSubnode
+module.exports.claimSubnodeAndSetAddr = claimSubnodeAndSetAddr
 module.exports.setPublicResolver = setPublicResolver
 module.exports.setPublicResolverAddr = setPublicResolverAddr
 module.exports.createFifsTldNamespace = createFifsTldNamespace
 module.exports.leafLabelAndNode = leafLabelAndNode
 module.exports.hash = namehash.hash
+module.exports.normalize = namehash.normalize
