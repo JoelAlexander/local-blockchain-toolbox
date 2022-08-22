@@ -8,9 +8,7 @@ try {
   const localNetwork = require('./network.json')
   config.defaultNetwork = 'local'
   config.networks = { local: localNetwork }
-} catch (e) {
-  console.log('Could not find local network, skipping.')
-}
+} catch (e) {}
 
 task(
   "checkBalance",
