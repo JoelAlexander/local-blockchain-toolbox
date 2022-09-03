@@ -10,6 +10,7 @@ echo \
  $(lsb_release -cs) stable" | sudo tee /etc/apt/sources.list.d/docker.list > /dev/null
 sudo apt update
 sudo apt install -y \
+  resolvconf\
   net-tools \
   wireless-tools \
   network-manager \

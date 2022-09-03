@@ -34,6 +34,9 @@ macAddress=$(nmcli dev show $wirelessInterface | awk '/GENERAL.HWADDR/ { print $
 gateway=$(nmcli dev show $wirelessInterface | awk '/IP4.GATEWAY/ { print $2 }')
 ipAddress=$(nmcli dev show $wirelessInterface | awk '/IP4.ADDRESS/ { print $2 }' | sed -e 's/\/.*//')
 
+echo "Running dhclient to configure wifi."
+sudo dhclient
+
 echo "Before proceding: "
 echo "Access the admin panel on your router: http://$gateway"
 echo "Give $macAddress a static IP of $ipAddress"
