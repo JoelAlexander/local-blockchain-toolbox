@@ -26,15 +26,21 @@ then
     $environmentFile | sponge $environmentFile
 fi
 
-$scriptPath/setup-domain.sh $environmentFile
-
 if [ "$mode" = 'create' ]
 then
+  $scriptPath/setup-domain.sh $environmentFile
   $scriptPath/create-bootnode.sh $environmentFile
   $scriptPath/create-poa-blockchain.sh $environmentFile
+
+  domain=$(jq -r '.domain' $environmentFile)
+  echo "Writing nginx config for $domain"
+  cat $scriptPath/nginx.conf.template | sed -e "s/{{DOMAIN}}/$domain/" > $scriptPath/nginx.conf
+
 elif [ "$mode" = 'join' ]
 then
   $scriptPath/create-bootnode.sh $environmentFile
+  echo "Writing nginx config, no ssl"
+  cat $scriptPath/nginx.conf.nossl.template | sed -e "s/{{DOMAIN}}/$domain/" > $scriptPath/nginx.conf
 else
   echo "Must setup with option 'create' or 'join'" && exit 1
 fi

@@ -42,9 +42,3 @@ then
   jq --arg blockchainUrl $blockchainUrl '.blockchainUrl |= $blockchainUrl'\
     $environmentFile | sponge $environmentFile
 fi
-
-if [ ! -f "$scriptPath/nginx.conf" ]
-then
-  echo "Writing nginx config for $domain"
-  cat $scriptPath/nginx.conf.template | sed -e "s/{{DOMAIN}}/$domain/" > $scriptPath/nginx.conf
-fi
