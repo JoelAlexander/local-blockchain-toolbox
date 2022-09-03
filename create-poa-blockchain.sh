@@ -17,12 +17,7 @@ then
     $environmentFile | sponge $environmentFile
 fi
 
-chainId=$(jq -r '.chainId' $environmentFile)
 genesisFile=$(jq -r '.genesisFile' $environmentFile)
-sealerAccount=$(jq -r '.sealerAccount' $environmentFile)
-sealerKeystore=$(jq -r '.sealerKeystore' $environmentFile)
-creatorFile=$(jq -r '.creatorFile' $environmentFile)
-blockchainUrl=$(jq -r '.blockchainUrl' $environmentFile)
 if [ "$genesisFile" = 'null' ]
 then
 
@@ -43,9 +38,11 @@ then
     --arg sealerKeystore $sealerKeystore\
     --arg genesisFile $genesisFile\
     --arg creatorFile $creatorFile\
-    '.chainId |= $chainId | .sealerAccount |= $sealerAccount | .sealerKeystore |= $sealerKeystore | .genesisFile |= $genesisFile | .creatorFile |= $creatorFile'\
+    '.sealerAccount |= $sealerAccount | .sealerKeystore |= $sealerKeystore | .genesisFile |= $genesisFile | .creatorFile |= $creatorFile'\
     $environmentFile | sponge $environmentFile
 
+  # TODO: this does not feel right to be here
+  blockchainUrl=$(jq -r '.blockchainUrl' $environmentFile)
   creatorPrivateKey=$(jq -r '.privateKey' $scriptPath/$creatorFile)
   jq --null-input\
     --arg creatorPrivateKey $creatorPrivateKey\

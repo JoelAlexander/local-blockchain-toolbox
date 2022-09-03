@@ -18,14 +18,7 @@ then
     $environmentFile | sponge $environmentFile
 elif [ "$bootnodeKey" = 'null' ] || [ "$bootnodeEnode" = 'null' ]
 then
-  echo "Invalid environment file, both BOOTNODE_KEY and BOOTNODE_ENODE should be set or unset"
+  echo "Invalid environment file, both bootnodeKey and bootnodeEnode should be set or unset"
 else
   echo "Using bootnode: $bootnodeEnode with key $bootnodeKey"
-fi
-
-if [ -z $"$(docker image ls bootnode | awk '/^bootnode/ { print }')" ]
-then
-  docker build -f $scriptPath/bootnode/Dockerfile -t bootnode:latest\
-    --build-arg GETH_BIN=$gethName\
-    $scriptPath
 fi

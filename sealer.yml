@@ -1,0 +1,30 @@
+version: "3.8"
+
+services:
+  sealingnode:
+    container_name: sealingnode
+    image: gethnode:latest
+    command: [
+      "--unlock", "${SEALER_ACCOUNT}",
+      "--password", "${SEALER_PASSWORD}",
+      "--mine",
+      "--networkid", "${CHAIN_ID}",
+      "--datadir", "/.ethereum",
+      "--bootnodes", "enode://${BOOTNODE_ENODE}@172.172.172.4:0?discport=30301",
+      "--netrestrict", "172.172.172.0/28",
+      "--nat", "extip:172.172.172.4",
+      "--ipcdisable",
+      "--txpool.lifetime", "12s",
+      "--txpool.pricebump", "5"
+    ]
+    volumes:
+      - /.ethereum/
+      - ./${GENESIS_FILE}:/${GENESIS_FILE}
+      - ./${SEALER_KEYSTORE}:/.ethereum/${SEALER_KEYSTORE}
+      - ./${SEALER_PASSWORD}:/${SEALER_PASSWORD}
+    depends_on:
+      - bootnode
+    networks:
+      geth-net:
+        ipv4_address: 172.172.172.4
+    restart: unless-stopped

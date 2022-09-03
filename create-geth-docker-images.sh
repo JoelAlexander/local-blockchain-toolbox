@@ -8,3 +8,10 @@ then
     --build-arg GETH_BIN=$gethName\
     $scriptPath
 fi
+
+if [ -z $"$(docker image ls bootnode | awk '/^bootnode/ { print }')" ]
+then
+  docker build -f $scriptPath/bootnode/Dockerfile -t bootnode:latest\
+    --build-arg GETH_BIN=$gethName\
+    $scriptPath
+fi

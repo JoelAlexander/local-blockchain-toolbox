@@ -1,0 +1,6 @@
+version: "3.8"
+
+services:
+    nginx:
+        volumes:
+            - ${APPLICATION_PATH}/dist:/var/www:ro

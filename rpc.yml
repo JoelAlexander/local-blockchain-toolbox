@@ -1,0 +1,45 @@
+version: "3.8"
+
+services:
+  bootnode:
+    container_name: bootnode
+    image: bootnode:latest
+    command: [
+      "--netrestrict", "172.172.172.0/28",
+      "--nat", "extip:172.172.172.2"
+    ]
+    volumes:
+      - ./${BOOTNODE_KEY}:/bootnode.key
+    networks:
+      geth-net:
+        ipv4_address: 172.172.172.2
+    restart: unless-stopped
+  rpcnode:
+    container_name: rpcnode
+    image: gethnode:latest
+    command: [
+      "--networkid", "${CHAIN_ID}",
+      "--datadir", "/.ethereum",
+      "--http",
+      "--http.api", "eth,net,rpc,web3,txpool",
+      "--http.addr", "0.0.0.0",
+      "--http.vhosts", "*",
+      "--http.corsdomain", "*",
+      "--bootnodes", "enode://${BOOTNODE_ENODE}@172.172.172.2:0?discport=30301",
+      "--netrestrict", "172.172.172.0/28",
+      "--nat", "extip:172.172.172.3",
+      "--gcmode", "archive",
+      "--txpool.lifetime", "12s",
+      "--txpool.pricebump", "5"
+    ]
+    volumes:
+      - /.ethereum/
+      - ./${GENESIS_FILE}:/${GENESIS_FILE}
+    depends_on:
+      - bootnode
+    ports:
+      - 8545:8545
+    networks:
+      geth-net:
+        ipv4_address: 172.172.172.3
+    restart: unless-stopped

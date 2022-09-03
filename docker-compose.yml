@@ -13,86 +13,13 @@ services:
             - ./nginx.conf:/etc/nginx/conf.d/default.conf:ro
             - ${CERT_FULLCHAIN}:/etc/ssl/certs/${DOMAIN}/fullchain.pem:ro
             - ${CERT_PRIVKEY}:/etc/ssl/certs/${DOMAIN}/privkey.pem:ro
-            - ${HYPHEN_PATH}/dist:/var/www:ro
         networks:
             - default
-            - eth-net
-        restart: unless-stopped
-
-    bootnode:
-        container_name: bootnode
-        image: bootnode:latest
-        command: [
-          "--netrestrict", "172.172.172.0/28",
-          "--nat", "extip:172.172.172.4"
-        ]
-        volumes:
-            - ./${BOOTNODE_KEY}:/bootnode.key
-        networks:
-            eth-net:
-                ipv4_address: 172.172.172.4
-        restart: unless-stopped
-
-    sealingnode:
-        container_name: sealingnode
-        image: gethnode:latest
-        command: [
-          "--unlock", "${SEALER_ACCOUNT}",
-          "--password", "${SEALER_PASSWORD}",
-          "--mine",
-          "--networkid", "${CHAIN_ID}",
-          "--datadir", "/.ethereum",
-          "--bootnodes", "enode://${BOOTNODE_ENODE}@172.172.172.4:0?discport=30301",
-          "--netrestrict", "172.172.172.0/28",
-          "--nat", "extip:172.172.172.2",
-          "--ipcdisable",
-          "--txpool.lifetime", "12s",
-          "--txpool.pricebump", "5"
-        ]
-        volumes:
-            - /.ethereum/
-            - ./${GENESIS_FILE}:/${GENESIS_FILE}
-            - ./${SEALER_KEYSTORE}:/.ethereum/${SEALER_KEYSTORE}
-            - ./${SEALER_PASSWORD}:/${SEALER_PASSWORD}
-        depends_on:
-            - bootnode
-        networks:
-            eth-net:
-                ipv4_address: 172.172.172.2
-        restart: unless-stopped
-
-    rpcnode:
-        container_name: rpcnode
-        image: gethnode:latest
-        command: [
-          "--networkid", "${CHAIN_ID}",
-          "--datadir", "/.ethereum",
-          "--http",
-          "--http.api", "eth,net,rpc,web3,txpool",
-          "--http.addr", "0.0.0.0",
-          "--http.vhosts", "*",
-          "--http.corsdomain", "*",
-          "--bootnodes", "enode://${BOOTNODE_ENODE}@172.172.172.4:0?discport=30301",
-          "--netrestrict", "172.172.172.0/28",
-          "--nat", "extip:172.172.172.3",
-          "--gcmode", "archive",
-          "--txpool.lifetime", "12s",
-          "--txpool.pricebump", "5"
-        ]
-        volumes:
-            - /.ethereum/
-            - ./${GENESIS_FILE}:/${GENESIS_FILE}
-        depends_on:
-            - bootnode
-        ports:
-            - 8545:8545
-        networks:
-            eth-net:
-                ipv4_address: 172.172.172.3
+            - geth-net
         restart: unless-stopped
 
 networks:
-    eth-net:
+    geth-net:
         driver: bridge
         ipam:
             config:

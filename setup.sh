@@ -1,5 +1,8 @@
 #!/bin/bash
 scriptPath=$(dirname $(realpath $0))
+mode=$1
+
+$scriptPath/create-geth-docker-images.sh
 
 environmentFile=$($scriptPath/get-environment-file.sh)
 
@@ -19,12 +22,21 @@ then
   git -C ~ clone https://github.com/JoelAlexander/hyphen
   hyphenPath=$(readlink -f ~/hyphen)
   jq --arg hyphenPath $hyphenPath\
-    '.hyphenPath |= $hyphenPath'\
+    '.applicationPath |= $hyphenPath'\
     $environmentFile | sponge $environmentFile
 fi
 
 $scriptPath/setup-domain.sh $environmentFile
-$scriptPath/setup-bootnode.sh $environmentFile
-$scriptPath/setup-gethnode.sh
-$scriptPath/create-poa-blockchain.sh $environmentFile
+
+if [ "$mode" = 'create' ]
+then
+  $scriptPath/create-bootnode.sh $environmentFile
+  $scriptPath/create-poa-blockchain.sh $environmentFile
+elif [ "$mode" = 'join' ]
+then
+  $scriptPath/create-bootnode.sh $environmentFile
+else
+  echo "Must setup with option 'create' or 'join'" && exit 1
+fi
+
 $scriptPath/start-blockchain.sh $environmentFile
