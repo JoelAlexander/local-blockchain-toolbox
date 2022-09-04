@@ -1,4 +1,4 @@
-pragma solidity >=0.8.4;
+pragma solidity >=0.8.16;
 import {INameWrapper, PublicResolver} from '@ensdomains/ens-contracts/contracts/resolvers/PublicResolver.sol';
 import '@ensdomains/ens-contracts/contracts/registry/ENSRegistry.sol';
 import '@ensdomains/ens-contracts/contracts/registry/FIFSRegistrar.sol';
