@@ -19,8 +19,8 @@ fi
 
 certPrivkey=$(jq -r '.privkey' $environmentFile)
 if [ "$certPrivkey" != 'null' ]
-  echo "CERT_PRIVKEY=$certPrivkey" >> $scriptPath/.env
 then
+  echo "CERT_PRIVKEY=$certPrivkey" >> $scriptPath/.env
 fi
 
 genesisFile=$(jq -r '.genesisFile' $environmentFile)
