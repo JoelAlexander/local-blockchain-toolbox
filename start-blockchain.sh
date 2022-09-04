@@ -5,40 +5,46 @@ environmentFile=$1
 # Create the .env file needed by dockerfile
 touch $scriptPath/.env && echo -n "" > $scriptPath/.env
 
+domain=$(jq -r '.domain' $environmentFile)
+if [ "$domain" != 'null' ]
+then
+  echo "DOMAIN=$domain" >> $scriptPath/.env
+fi
+
+certFullchain=$(jq -r '.fullchain' $environmentFile)
+if [ "$certFullchain" != 'null' ]
+then
+  echo "CERT_FULLCHAIN=$certFullchain" >> $scriptPath/.env
+fi
+
+certPrivkey=$(jq -r '.privkey' $environmentFile)
+if [ "$certPrivkey" != 'null' ]
+  echo "CERT_PRIVKEY=$certPrivkey" >> $scriptPath/.env
+then
+fi
+
 genesisFile=$(jq -r '.genesisFile' $environmentFile)
 chainId=$(jq -r '.config.chainId' $genesisFile)
-domain=$(jq -r '.domain' $environmentFile)
-certFullchain=$(jq -r '.fullchain' $environmentFile)
-certPrivkey=$(jq -r '.privkey' $environmentFile)
 bootnodeKey=$(jq -r '.bootnodeKey' $environmentFile)
 bootnodeEnode=$(jq -r '.bootnodeEnode' $environmentFile)
-sealerAccount=$(jq -r '.sealerAccount' $environmentFile)
-sealerKeystore=$(jq -r '.sealerKeystore' $environmentFile)
-sealerPassword=$(jq -r '.sealerPassword' $environmentFile)
-applicationPath=$(jq -r '.applicationPath' $environmentFile)
-
 if\
   [ "$genesisFile" != 'null' ] &&\
   [ "$chainId" != 'null' ] &&\
-  [ "$domain" != 'null' ] &&\
-  [ "$certFullchain" != 'null' ] &&\
-  [ "$certPrivkey" != 'null' ] &&\
   [ "$bootnodeKey" != 'null' ] &&\
   [ "$bootnodeEnode" != 'null' ]
 then
   composeFileArgs="-f $scriptPath/docker-compose.yml -f $scriptPath/rpc.yml"
-
   echo "GENESIS_FILE=$genesisFile" >> $scriptPath/.env
   echo "CHAIN_ID=$chainId" >> $scriptPath/.env
-  echo "DOMAIN=$domain" >> $scriptPath/.env
-  echo "CERT_FULLCHAIN=$certFullchain" >> $scriptPath/.env
-  echo "CERT_PRIVKEY=$certPrivkey" >> $scriptPath/.env
   echo "BOOTNODE_KEY=$bootnodeKey" >> $scriptPath/.env
   echo "BOOTNODE_ENODE=$bootnodeEnode" >> $scriptPath/.env
 else
-  echo "Genesis file, domain, certificates, and bootnode information required to start blockchain" && exit 1
+  echo "Genesis file and bootnode information required to start blockchain" && exit 1
 fi
 
+sealerAccount=$(jq -r '.sealerAccount' $environmentFile)
+sealerKeystore=$(jq -r '.sealerKeystore' $environmentFile)
+sealerPassword=$(jq -r '.sealerPassword' $environmentFile)
 if\
   [ "$sealerAccount" != 'null' ] &&\
   [ "$sealerKeystore" != 'null' ] &&\
@@ -52,6 +58,7 @@ else
   echo "No sealing account specified, skipping sealing node"
 fi
 
+applicationPath=$(jq -r '.applicationPath' $environmentFile)
 if [ "$applicationPath" != 'null' ]
 then
   composeFileArgs="$composeFileArgs -f $scriptPath/application.yml"
