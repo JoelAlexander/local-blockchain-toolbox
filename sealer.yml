@@ -10,7 +10,7 @@ services:
       "--mine",
       "--networkid", "${CHAIN_ID}",
       "--datadir", "/.ethereum",
-      "--bootnodes", "enode://${BOOTNODE_ENODE}@172.172.172.4:0?discport=30301",
+      "--bootnodes", "enode://${BOOTNODE_ENODE}@172.172.172.2:0?discport=30301",
       "--netrestrict", "172.172.172.0/28",
       "--nat", "extip:172.172.172.4",
       "--ipcdisable",
