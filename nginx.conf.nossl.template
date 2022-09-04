@@ -1,6 +1,6 @@
 server {
-    listen 80 http;
-    listen [::]:80 http;
+    listen 80;
+    listen [::]:80;
 
     location / {
         proxy_pass http://rpcnode:8545;
@@ -8,8 +8,8 @@ server {
 }
 
 server {
-    listen 80 http;
-    listen [::]:80 http;
+    listen 80;
+    listen [::]:80;
 
     location / {
         root /var/www;

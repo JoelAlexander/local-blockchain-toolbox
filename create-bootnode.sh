@@ -12,6 +12,7 @@ then
   echo "Creating new bootnode."
   bootnodeKey=bootnode.key
   bootnodeEnode=$($bootnode -genkey $scriptPath/bootnode.key -writeaddress)
+  chmod +rw $bootnodeKey
   jq --arg bootnodeKey $bootnodeKey\
     --arg bootnodeEnode $bootnodeEnode\
     '.bootnodeKey |= $bootnodeKey | .bootnodeEnode |= $bootnodeEnode'\
