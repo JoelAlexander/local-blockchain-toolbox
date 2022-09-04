@@ -40,7 +40,7 @@ elif [ "$mode" = 'join' ]
 then
   $scriptPath/create-bootnode.sh $environmentFile
   echo "Writing nginx config, no ssl"
-  cat $scriptPath/nginx.conf.nossl.template | sed -e "s/{{DOMAIN}}/$domain/" > $scriptPath/nginx.conf
+  cat $scriptPath/nginx.conf.nossl.template > $scriptPath/nginx.conf
 else
   echo "Must setup with option 'create' or 'join'" && exit 1
 fi

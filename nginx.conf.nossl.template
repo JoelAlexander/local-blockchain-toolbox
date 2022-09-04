@@ -6,13 +6,3 @@ server {
         proxy_pass http://rpcnode:8545;
     }
 }
-
-server {
-    listen 80;
-    listen [::]:80;
-
-    location / {
-        root /var/www;
-        index index.html;
-    }
-}
