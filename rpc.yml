@@ -10,9 +10,6 @@ services:
     ]
     volumes:
       - ./${BOOTNODE_KEY}:/bootnode.key
-    ports:
-      - "30301:30301/tcp"
-      - "30301:30301/udp"
     networks:
       default:
       geth-net:
@@ -43,6 +40,8 @@ services:
       - bootnode
     ports:
       - 8545:8545
+      - "30303:30303/tcp"
+      - "30303:30303/udp"
     networks:
       geth-net:
         ipv4_address: 172.172.172.3
