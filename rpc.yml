@@ -43,6 +43,7 @@ services:
       - "30303:30303/tcp"
       - "30303:30303/udp"
     networks:
+      default:
       geth-net:
         ipv4_address: 172.172.172.3
     restart: unless-stopped
