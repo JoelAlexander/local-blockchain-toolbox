@@ -11,8 +11,6 @@ services:
             - 443:443
         volumes:
             - ./nginx.conf:/etc/nginx/conf.d/default.conf:ro
-            - ${CERT_FULLCHAIN}:/etc/ssl/certs/${DOMAIN}/fullchain.pem:ro
-            - ${CERT_PRIVKEY}:/etc/ssl/certs/${DOMAIN}/privkey.pem:ro
         networks:
             - default
             - geth-net

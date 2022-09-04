@@ -5,21 +5,18 @@ environmentFile=$1
 # Create the .env file needed by dockerfile
 touch $scriptPath/.env && echo -n "" > $scriptPath/.env
 
+composeFileArgs="-f $scriptPath/docker-compose.yml"
+
 domain=$(jq -r '.domain' $environmentFile)
-if [ "$domain" != 'null' ]
-then
-  echo "DOMAIN=$domain" >> $scriptPath/.env
-fi
-
 certFullchain=$(jq -r '.fullchain' $environmentFile)
-if [ "$certFullchain" != 'null' ]
-then
-  echo "CERT_FULLCHAIN=$certFullchain" >> $scriptPath/.env
-fi
-
 certPrivkey=$(jq -r '.privkey' $environmentFile)
-if [ "$certPrivkey" != 'null' ]
+if [ "$domain" != 'null' ] &&\
+   [ "$certFullchain" != 'null' ] &&\
+   [ "$certPrivkey" != 'null' ]
 then
+  composeFileArgs="$composeFileArgs -f $scriptPath/ssl.yml"
+  echo "DOMAIN=$domain" >> $scriptPath/.env
+  echo "CERT_FULLCHAIN=$certFullchain" >> $scriptPath/.env
   echo "CERT_PRIVKEY=$certPrivkey" >> $scriptPath/.env
 fi
 
@@ -33,7 +30,7 @@ if\
   [ "$bootnodeKey" != 'null' ] &&\
   [ "$bootnodeEnode" != 'null' ]
 then
-  composeFileArgs="-f $scriptPath/docker-compose.yml -f $scriptPath/rpc.yml"
+  composeFileArgs="$composeFileArgs -f $scriptPath/rpc.yml"
   echo "GENESIS_FILE=$genesisFile" >> $scriptPath/.env
   echo "CHAIN_ID=$chainId" >> $scriptPath/.env
   echo "BOOTNODE_KEY=$bootnodeKey" >> $scriptPath/.env
