@@ -20,12 +20,12 @@ then
   echo "CERT_PRIVKEY=$certPrivkey" >> $scriptPath/.env
 fi
 
-genesisFile="$scriptPath/genesis.json"
+genesisFile="genesis.json"
 chainId=$(jq -r '.config.chainId' $genesisFile)
 bootnodeKey=$(jq -r '.bootnodeKey' $environmentFile)
 bootnodeEnode=$(jq -r '.bootnodeEnode' $environmentFile)
 if\
-  [ "$genesisFile" != 'null' ] &&\
+  [ -f $genesisFile ] &&\
   [ "$chainId" != 'null' ] &&\
   [ "$bootnodeKey" != 'null' ] &&\
   [ "$bootnodeEnode" != 'null' ]

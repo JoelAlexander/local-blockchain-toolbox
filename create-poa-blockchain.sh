@@ -17,7 +17,7 @@ then
     $environmentFile | sponge $environmentFile
 fi
 
-genesisFile="$scriptPath/genesis.json"
+genesisFile="genesis.json"
 if [ ! -f $genesisFile ]
 then
 
