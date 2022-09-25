@@ -34,13 +34,13 @@ then
 
   domain=$(jq -r '.domain' $environmentFile)
   echo "Writing nginx config for $domain"
-  cat $scriptPath/nginx.conf.template | sed -e "s/{{DOMAIN}}/$domain/" > $scriptPath/nginx.conf
+  cat $scriptPath/http.conf.template | sed -e "s/{{DOMAIN}}/$domain/" > $scriptPath/http.conf
 
 elif [ "$mode" = 'join' ]
 then
   $scriptPath/create-bootnode.sh $environmentFile
   echo "Writing nginx config, no ssl"
-  cat $scriptPath/nginx.conf.nossl.template > $scriptPath/nginx.conf
+  cat $scriptPath/http.conf.nossl.template > $scriptPath/http.conf
 else
   echo "Must setup with option 'create' or 'join'" && exit 1
 fi

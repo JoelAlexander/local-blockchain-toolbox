@@ -10,7 +10,9 @@ services:
             - 80:80
             - 443:443
         volumes:
-            - ./nginx.conf:/etc/nginx/conf.d/default.conf:ro
+            - ./nginx.conf:/etc/nginx/nginx.conf:ro
+            - ./http.conf:/etc/nginx/conf.d/http.conf:ro
+            - ./stream.conf:/etc/nginx/conf.d/stream.conf:ro
         networks:
             - default
             - geth-net
