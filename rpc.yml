@@ -11,7 +11,6 @@ services:
     volumes:
       - ./${BOOTNODE_KEY}:/bootnode.key
     networks:
-      default:
       geth-net:
         ipv4_address: 172.172.172.2
     restart: unless-stopped
@@ -27,7 +26,7 @@ services:
       "--http.vhosts", "*",
       "--http.corsdomain", "*",
       "--bootnodes", "enode://${BOOTNODE_ENODE}@172.172.172.2:0?discport=30301",
-      "--netrestrict", "172.172.172.0/28",
+      "--netrestrict", "172.172.172.0/28,192.168.86.0/24",
       "--nat", "extip:172.172.172.3",
       "--gcmode", "archive",
       "--txpool.lifetime", "12s",
@@ -43,7 +42,6 @@ services:
       - "30303:30303/tcp"
       - "30303:30303/udp"
     networks:
-      default:
       geth-net:
         ipv4_address: 172.172.172.3
     restart: unless-stopped

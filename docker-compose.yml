@@ -4,8 +4,6 @@ services:
     nginx:
         container_name: nginx
         image: nginx:stable
-        depends_on:
-            - rpcnode
         ports:
             - 80:80
             - 443:443
