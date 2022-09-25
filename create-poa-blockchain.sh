@@ -28,7 +28,7 @@ then
 
   echo -n "Enter a chain ID for the blockchain genesis: "
   read chainId
-  creatorFile="$scriptPath/creator.json"
+  creatorFile=creator.json
 
   npx hardhat makeGenesis --chain-id $chainId --sealer-address $sealerAccount --genesis-file $genesisFile --creator-file $creatorFile
 
