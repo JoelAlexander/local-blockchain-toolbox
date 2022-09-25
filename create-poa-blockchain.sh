@@ -17,8 +17,8 @@ then
     $environmentFile | sponge $environmentFile
 fi
 
-genesisFile=$(jq -r '.genesisFile' $environmentFile)
-if [ "$genesisFile" = 'null' ]
+genesisFile="$scriptPath/genesis.json"
+if [ ! -f $genesisFile ]
 then
 
   # TODO: All of the cases where we have a genesis file but we aren't a sealer
@@ -28,17 +28,15 @@ then
 
   echo -n "Enter a chain ID for the blockchain genesis: "
   read chainId
-  genesisFile=genesis.json
-  creatorFile=creator.json
+  creatorFile="$scriptPath/creator.json"
 
   npx hardhat makeGenesis --chain-id $chainId --sealer-address $sealerAccount --genesis-file $genesisFile --creator-file $creatorFile
 
   jq --argjson chainId $chainId\
     --arg sealerAccount $sealerAccount\
     --arg sealerKeystore $sealerKeystore\
-    --arg genesisFile $genesisFile\
     --arg creatorFile $creatorFile\
-    '.sealerAccount |= $sealerAccount | .sealerKeystore |= $sealerKeystore | .genesisFile |= $genesisFile | .creatorFile |= $creatorFile'\
+    '.sealerAccount |= $sealerAccount | .sealerKeystore |= $sealerKeystore | .creatorFile |= $creatorFile'\
     $environmentFile | sponge $environmentFile
 
   # TODO: this does not feel right to be here

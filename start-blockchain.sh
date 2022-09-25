@@ -20,7 +20,7 @@ then
   echo "CERT_PRIVKEY=$certPrivkey" >> $scriptPath/.env
 fi
 
-genesisFile=$(jq -r '.genesisFile' $environmentFile)
+genesisFile="$scriptPath/genesis.json"
 chainId=$(jq -r '.config.chainId' $genesisFile)
 bootnodeKey=$(jq -r '.bootnodeKey' $environmentFile)
 bootnodeEnode=$(jq -r '.bootnodeEnode' $environmentFile)
