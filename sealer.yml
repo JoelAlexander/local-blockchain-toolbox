@@ -10,9 +10,9 @@ services:
       "--mine",
       "--networkid", "${CHAIN_ID}",
       "--datadir", "/.ethereum",
-      "--bootnodes", "enode://${BOOTNODE_ENODE}@172.172.172.2:0?discport=30301",
+      "--bootnodes", "enode://${BOOTNODE_ENODE}@172.172.172.2:30303",
       "--netrestrict", "172.172.172.0/28",
-      "--nat", "extip:172.172.172.4",
+      "--nat", "extip:172.172.172.3",
       "--ipcdisable",
       "--txpool.lifetime", "12s",
       "--txpool.pricebump", "5"
@@ -22,9 +22,7 @@ services:
       - ./${GENESIS_FILE}:/${GENESIS_FILE}
       - ./${SEALER_KEYSTORE}:/.ethereum/${SEALER_KEYSTORE}
       - ./${SEALER_PASSWORD}:/${SEALER_PASSWORD}
-    depends_on:
-      - bootnode
     networks:
       geth-net:
-        ipv4_address: 172.172.172.4
+        ipv4_address: 172.172.172.3
     restart: unless-stopped
