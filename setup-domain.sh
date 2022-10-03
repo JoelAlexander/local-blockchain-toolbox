@@ -1,17 +1,10 @@
 #!/bin/bash
 scriptPath=$(dirname $(realpath $0))
 environmentFile=$1
+domain=$2
 
-domain=$(jq -r '.domain' $environmentFile)
-if [ "$domain" == 'null' ]
-then
-  echo -n "Enter your domain: "
-  read domain
-  sudo certbot certonly --manual --preferred-challenges=dns -d "$domain" -d "blockchain.$domain" --register-unsafely-without-email
-  jq --arg domain $domain '.domain |= $domain' $environmentFile | sponge $environmentFile
-else
-  echo "Using domain: $domain"
-fi
+sudo certbot certonly --manual --preferred-challenges=dns -d "$domain" -d "blockchain.$domain" --register-unsafely-without-email
+jq --arg domain $domain '.domain |= $domain' $environmentFile | sponge $environmentFile
 
 # TODO: Detect certificates better than just guessing
 certs="/etc/letsencrypt/live/$domain"

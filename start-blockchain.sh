@@ -80,7 +80,7 @@ fi
 
 docker compose\
   $composeFileArgs\
-  up nginx headscale
+  up -d
 
 # blockchainUrl=$(jq -r '.blockchainUrl' $environmentFile)
 # status=$(curl $blockchainUrl)

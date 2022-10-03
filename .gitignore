@@ -6,6 +6,8 @@ keystore**
 geth-alltools**
 nvm_install.sh
 *.conf
+!stream.conf
+!nginx.conf
 node_modules
 package-lock.json
 environment.json

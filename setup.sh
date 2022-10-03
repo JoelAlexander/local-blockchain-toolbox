@@ -1,6 +1,7 @@
 #!/bin/bash
 scriptPath=$(dirname $(realpath $0))
 mode=$1
+domain=$2
 
 $scriptPath/create-geth-docker-images.sh
 
@@ -26,15 +27,21 @@ then
     $environmentFile | sponge $environmentFile
 fi
 
+if [ -z $domain ]
+then
+  echo "Domain must be provided" && exit 1
+fi
+
 if [ "$mode" = 'create' ]
 then
-  $scriptPath/setup-domain.sh $environmentFile
+  $scriptPath/setup-domain.sh $environmentFile $domain
   $scriptPath/setup-headscale.sh $environmentFile
   $scriptPath/create-bootnode.sh $environmentFile
   $scriptPath/create-poa-blockchain.sh $environmentFile
 elif [ "$mode" = 'join' ]
 then
   $scriptPath/create-bootnode.sh $environmentFile
+  $scriptPath/join-network.sh $domain
 else
   echo "Must setup with option 'create' or 'join'" && exit 1
 fi
