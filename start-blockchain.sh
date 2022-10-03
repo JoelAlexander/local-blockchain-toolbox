@@ -18,6 +18,11 @@ then
   echo "DOMAIN=$domain" >> $scriptPath/.env
   echo "CERT_FULLCHAIN=$certFullchain" >> $scriptPath/.env
   echo "CERT_PRIVKEY=$certPrivkey" >> $scriptPath/.env
+  echo "Writing nginx config for $domain"
+  cat $scriptPath/http.conf.template | sed -e "s/{{DOMAIN}}/$domain/" > $scriptPath/http.conf
+else
+  echo "Writing nginx config, no ssl"
+  cat $scriptPath/http.conf.nossl.template > $scriptPath/http.conf
 fi
 
 genesisFile="genesis.json"
@@ -64,18 +69,27 @@ else
   echo "No application path specified, skipping nginx application volume"
 fi
 
+headscaleConfig=$(jq -r '.headscaleConfig' $environmentFile)
+if [ "$headscaleConfig" != 'null' ]
+then
+  composeFileArgs="$composeFileArgs -f $scriptPath/headscale.yml"
+  echo "HEADSCALE_PATH=$headscaleConfig" >> $scriptPath/.env
+  cat $scriptPath/headscale-config.yaml.template | sed -e "s/{{DOMAIN}}/$domain/" > $headscaleConfig/config.yaml
+  docker compose -f headscale.yml up -d && docker compose -f headscale.yml exec -it headscale headscale namespaces create nodes
+fi
+
 docker compose\
   $composeFileArgs\
-  up -d
+  up nginx headscale
 
-blockchainUrl=$(jq -r '.blockchainUrl' $environmentFile)
-status=$(curl $blockchainUrl)
+# blockchainUrl=$(jq -r '.blockchainUrl' $environmentFile)
+# status=$(curl $blockchainUrl)
 # TODO: This while loop doesn't quite work...e.g.when DNS is not set up correctly
-while [ ! -z $status ]
-do
-  echo "Waiting for blockchain to come online."
-  sleep 2
-  status=$(curl $blockchainUrl)
-done
+# while [ ! -z $status ]
+# do
+#   echo "Waiting for blockchain to come online."
+#   sleep 2
+#   status=$(curl $blockchainUrl)
+# done
 
-echo "Blockchain online."
+# echo "Blockchain online."

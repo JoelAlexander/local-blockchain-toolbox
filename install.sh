@@ -30,6 +30,9 @@ sudo apt install -y \
   jq\
   moreutils
 
+# Install tailscale
+curl -fsSL https://tailscale.com/install.sh | sh
+
 # TODO: Check if nvm / node is already installed
 curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.39.1/install.sh > nvm.sh && chmod +x nvm.sh && ./nvm.sh && rm nvm.sh
 

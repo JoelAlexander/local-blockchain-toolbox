@@ -1,0 +1,17 @@
+version: "3.8"
+
+services:
+  headscale:
+    container_name: headscale
+    image: headscale/headscale:latest
+    command: [
+      "headscale", "serve"
+    ]
+    volumes:
+      - ${HEADSCALE_PATH}:/etc/headscale
+    expose:
+      - 8080
+      - 9090
+    networks:
+      - default
+    restart: unless-stopped
