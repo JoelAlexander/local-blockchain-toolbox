@@ -13,21 +13,6 @@ server {
 }
 
 server {
-    listen 8080;
-    listen [::]:8080;
-
-    server_name {{DOMAIN}};
-
-    location / {
-        proxy_pass http://headscale:8080;
-        proxy_http_version 1.1;
-        proxy_set_header Upgrade $http_upgrade;
-        proxy_set_header Connection "Upgrade";
-        proxy_set_header Host $host;
-    }
-}
-
-server {
     listen 9090;
     listen [::]:9090;
 
@@ -47,6 +32,24 @@ server {
     listen [::]:443 http2 ssl;
 
     server_name {{DOMAIN}};
+
+    ssl_certificate /etc/ssl/certs/{{DOMAIN}}/fullchain.pem;
+    ssl_certificate_key /etc/ssl/certs/{{DOMAIN}}/privkey.pem;
+
+    location / {
+        proxy_pass http://headscale:8080;
+        proxy_http_version 1.1;
+        proxy_set_header Upgrade $http_upgrade;
+        proxy_set_header Connection "Upgrade";
+        proxy_set_header Host $host;
+    }
+}
+
+server {
+    listen 443 http2 ssl;
+    listen [::]:443 http2 ssl;
+
+    server_name app.{{DOMAIN}};
 
     ssl_certificate /etc/ssl/certs/{{DOMAIN}}/fullchain.pem;
     ssl_certificate_key /etc/ssl/certs/{{DOMAIN}}/privkey.pem;

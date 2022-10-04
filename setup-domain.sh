@@ -3,7 +3,7 @@ scriptPath=$(dirname $(realpath $0))
 environmentFile=$1
 domain=$2
 
-sudo certbot certonly --manual --preferred-challenges=dns -d "$domain" -d "blockchain.$domain" --register-unsafely-without-email
+sudo certbot certonly --manual --preferred-challenges=dns -d "$domain" -d "app.$domain" -d "blockchain.$domain" --register-unsafely-without-email
 jq --arg domain $domain '.domain |= $domain' $environmentFile | sponge $environmentFile
 
 # TODO: Detect certificates better than just guessing

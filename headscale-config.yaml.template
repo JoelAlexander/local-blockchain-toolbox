@@ -10,7 +10,7 @@
 #
 # https://myheadscale.example.com:443
 #
-server_url: http://{{DOMAIN}}:8080
+server_url: https://{{DOMAIN}}:443
 
 # Address to listen to / bind to on the server
 #
@@ -217,7 +217,7 @@ dns_config:
   # `base_domain` must be a FQDNs, without the trailing dot.
   # The FQDN of the hosts will be
   # `hostname.namespace.base_domain` (e.g., _myhost.mynamespace.example.com_).
-  base_domain: example.com
+  base_domain: {{DOMAIN}}
 
 # Unix socket used for the CLI to connect without authentication
 # Note: for local development, you probably want to change this to:
