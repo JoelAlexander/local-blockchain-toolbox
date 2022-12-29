@@ -1,5 +1,4 @@
 #!/bin/bash
-
 scriptPath=$(dirname $(realpath $0))
 
 # TODO: Assumes linux
@@ -15,13 +14,15 @@ fi
 
 # Pull geth if needed to local directory.
 # TODO: Probably could clean up this geth install to be more respectful
+gethInstallFolder="$scriptPath/host"
 gethName="geth-alltools-linux-${variant}-1.10.19-23bee162"
 gethPackage="$gethName.tar.gz"
 gethDownload="https://gethstore.blob.core.windows.net/builds/$gethPackage"
-gethPath="$scriptPath/$gethName"
-gethPackagePath="$scriptPath/$gethPackage"
-if [[ ! -d $gethPath || ! -f $gethPackagePath ]]; then
-  curl $gethDownload --output $gethPackagePath && tar -xzf $gethPackagePath --directory $scriptPath
+gethPath="$gethInstallFolder/$gethName"
+gethPackagePath="$gethInstallFolder/$gethPackage"
+if [[ ! -d $gethPath ]]; then
+  curl $gethDownload --output $gethPackagePath && tar -xzf $gethPackagePath --directory $gethInstallFolder
+  rm $gethPackagePath
 fi
 
-echo $gethName
+echo $gethPath

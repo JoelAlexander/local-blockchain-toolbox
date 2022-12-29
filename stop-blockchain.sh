@@ -1,54 +1,46 @@
 #!/bin/bash
 scriptPath=$(dirname $(realpath $0))
-environmentFile=$1
-mode=$2
+gethPath=$($scriptPath/install-geth.sh)
+bootnode="$gethPath/bootnode"
+mode=$1
+chainName=$2
+domain=$3
 
-composeFileArgs="-f $scriptPath/docker-compose.yml"
-
-domain=$(jq -r '.domain' $environmentFile)
-certFullchain=$(jq -r '.fullchain' $environmentFile)
-certPrivkey=$(jq -r '.privkey' $environmentFile)
-if [ "$domain" != 'null' ] &&\
-   [ "$certFullchain" != 'null' ] &&\
-   [ "$certPrivkey" != 'null' ]
+dockerPath="$scriptPath/docker"
+chainDir="$scriptPath/chains/$chainName"
+if [ ! -d $chainDir ]
 then
-  composeFileArgs="$composeFileArgs -f $scriptPath/ssl.yml"
+  echo "Chain $chainName does not exist" && exit 1
 fi
 
-genesisFile="genesis.json"
-chainId=$(jq -r '.config.chainId' $genesisFile)
-bootnodeKey=$(jq -r '.bootnodeKey' $environmentFile)
-bootnodeEnode=$(jq -r '.bootnodeEnode' $environmentFile)
-if\
-  [ -f $genesisFile ] &&\
-  [ "$chainId" != 'null' ] &&\
-  [ "$bootnodeKey" != 'null' ] &&\
-  [ "$bootnodeEnode" != 'null' ]
+composeFileArgs="-f $dockerPath/docker-compose.yml -f $dockerPath/rpc.yml"
+
+certs="/etc/letsencrypt/live/$domain"
+fullchain="$certs/fullchain.pem"
+privkey="$certs/privkey.pem"
+if sudo test -f "$fullchain" && sudo test -f "$privkey"
 then
-  composeFileArgs="$composeFileArgs -f $scriptPath/rpc.yml"
+  composeFileArgs="$composeFileArgs -f $dockerPath/ssl.yml"
 fi
 
-sealerAccount=$(jq -r '.sealerAccount' $environmentFile)
-sealerKeystore=$(jq -r '.sealerKeystore' $environmentFile)
-sealerPassword=$(jq -r '.sealerPassword' $environmentFile)
-if\
-  [ "$sealerAccount" != 'null' ] &&\
-  [ "$sealerKeystore" != 'null' ] &&\
-  [ "$sealerPassword" != 'null' ]
+sealerAccount=$(jq -r '.extraData|split("x")[1][64:104]' $chainDir/genesis.json)
+sealerKeystore=$(find $chainDir -type f -iname "*$sealerAccount" | head -n 1)
+sealerPassword=$chainDir/password.txt
+if [ -f "$sealerKeystore" ] && [ -f "$sealerPassword" ]
 then
-  composeFileArgs="$composeFileArgs -f $scriptPath/sealer.yml"
+  composeFileArgs="$composeFileArgs -f $dockerPath/sealer.yml"
 fi
 
-applicationPath=$(jq -r '.applicationPath' $environmentFile)
-if [ "$applicationPath" != 'null' ]
+applicationPath=~/hyphen
+if [ -d $applicationPath ]
 then
-  composeFileArgs="$composeFileArgs -f $scriptPath/application.yml"
+  composeFileArgs="$composeFileArgs -f $dockerPath/application.yml"
 fi
 
-headscaleConfig=$(jq -r '.headscaleConfig' $environmentFile)
-if [ "$headscaleConfig" != 'null' ]
+headscaleConfig="$scriptPath/headscale/config"
+if [ -d $headscaleConfig ]
 then
-  composeFileArgs="$composeFileArgs -f $scriptPath/headscale.yml"
+  composeFileArgs="$composeFileArgs -f $dockerPath/headscale.yml"
 fi
 
 if [ "$mode" = 'stop' ]

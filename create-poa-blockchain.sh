@@ -1,50 +1,33 @@
 #!/bin/bash
 scriptPath=$(dirname $(realpath $0))
-gethName=$($scriptPath/install-geth.sh)
-geth="$scriptPath/$gethName/geth"
-environmentFile=$1
+gethPath=$($scriptPath/install-geth.sh)
+geth="$gethPath/geth"
+chainName=$1
 
-sealerPassword=$(jq -r '.sealerPassword' $environmentFile)
-if [ "$sealerPassword" = 'null' ]
+chainDir="$scriptPath/chains/$chainName"
+if [ -d "$chainDir" ]
 then
-  # TODO: The key is unlocked with no password, so is only as secure as the host password
-  echo -n "Enter a password for the new sealing account: "
-  read password
-  sealerPassword=password.txt
-  echo $password > $scriptPath/$sealerPassword
-  jq --arg sealerPassword $sealerPassword\
-    '.sealerPassword |= $sealerPassword'\
-    $environmentFile | sponge $environmentFile
+  echo "Chain with name $chainName already exists: $chainDir" && exit 1
 fi
 
-genesisFile="genesis.json"
-if [ ! -f $genesisFile ]
-then
+mkdir -p $chainDir
 
-  # TODO: All of the cases where we have a genesis file but we aren't a sealer
-  newAccountOutput=$($geth account new --password "$scriptPath/$sealerPassword" --datadir $scriptPath)
-  sealerAccount=$(echo $newAccountOutput | awk '{ print $11 }')
-  sealerKeystore=$(realpath --relative-to=$scriptPath $(echo $newAccountOutput | awk '{ print $18 }'))
+echo -n "Enter a password for the new sealing account: "
+read password
+sealerPassword=password.txt
+echo $password > $chainDir/$sealerPassword
 
-  echo -n "Enter a chain ID for the blockchain genesis: "
-  read chainId
-  creatorFile=creator.json
+# TODO: All of the cases where we have a genesis file but we aren't a sealer
+newAccountOutput=$($geth account new --password "$chainDir/$sealerPassword" --datadir $chainDir)
+sealerAccount=$(echo $newAccountOutput | awk '{ print $11 }')
+sealerKeystore=$(realpath --relative-to=$chainDir $(echo $newAccountOutput | awk '{ print $18 }'))
 
-  npx hardhat makeGenesis --chain-id $chainId --sealer-address $sealerAccount --genesis-file $genesisFile --creator-file $creatorFile
+echo -n "Enter a chain ID for the blockchain genesis: "
+read chainId
 
-  jq --argjson chainId $chainId\
-    --arg sealerAccount $sealerAccount\
-    --arg sealerKeystore $sealerKeystore\
-    --arg creatorFile $creatorFile\
-    '.sealerAccount |= $sealerAccount | .sealerKeystore |= $sealerKeystore | .creatorFile |= $creatorFile'\
-    $environmentFile | sponge $environmentFile
+npx hardhat makeGenesis\
+  --chain-id $chainId\
+  --sealer-address $sealerAccount\
+  --chain-dir $chainDir
 
-  # TODO: this does not feel right to be here
-  blockchainUrl=$(jq -r '.blockchainUrl' $environmentFile)
-  creatorPrivateKey=$(jq -r '.privateKey' $scriptPath/$creatorFile)
-  jq --null-input\
-    --arg creatorPrivateKey $creatorPrivateKey\
-    --argjson chainId $chainId\
-    --arg blockchainUrl $blockchainUrl\
-    '{ "chainId": $chainId, "url": $blockchainUrl, "accounts": [ $creatorPrivateKey ]}' | sponge $scriptPath/network.json
-fi
+$scriptPath/create-bootnode.sh $chainName

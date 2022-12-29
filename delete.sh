@@ -1,6 +1,13 @@
 #!/bin/bash
 scriptPath=$(dirname $(realpath $0))
-environmentFile=$($scriptPath/get-environment-file.sh)
-$scriptPath/stop-blockchain.sh $environmentFile stop
-$scriptPath/stop-blockchain.sh $environmentFile remove
-rm -rf .env network.json package-lock.json creator.json environment.json bootnode.key password.txt genesis.json keystore http.conf headscale
+chainName=$1
+
+chainDir="$scriptPath/chains/$chainName"
+if [ -d "$chainDir" ]
+then
+	rm -rf $chainDir
+	$scriptPath/stop-blockchain.sh $chainName stop
+	$scriptPath/stop-blockchain.sh $chainName remove
+else
+	echo "Chain not found: $chainName"
+fi

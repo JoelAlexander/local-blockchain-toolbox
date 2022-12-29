@@ -5,15 +5,14 @@
 keystore**
 geth-alltools**
 nvm_install.sh
-*.conf
+http.conf
 !stream.conf
 !nginx.conf
 node_modules
 package-lock.json
-environment.json
 artifacts
 cache
 creator.json
 genesis.json
-network.json
 headscale
+chains

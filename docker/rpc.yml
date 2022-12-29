@@ -25,8 +25,8 @@ services:
     ]
     volumes:
       - /.ethereum/
-      - ./${GENESIS_FILE}:/${GENESIS_FILE}
-      - ./${BOOTNODE_KEY}:/bootnode.key
+      - ${CHAIN_DIR}/genesis.json:/genesis.json
+      - ${CHAIN_DIR}/bootnode.key:/bootnode.key
     expose:
       - 8545
       - "30303/tcp"

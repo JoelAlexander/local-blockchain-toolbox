@@ -8,6 +8,7 @@
     "deployModule": "hardhat run --network local scripts/deployModule.js"
   },
   "devDependencies": {
+    "@local-blockchain-toolbox/contract-primitives": "^1.0.9",
     "@ensdomains/ens-contracts": "^0.0.11",
     "@nomiclabs/hardhat-ethers": "^2.1.0",
     "@openzeppelin/contracts": "^4.7.2",

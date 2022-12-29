@@ -12,8 +12,16 @@
     }
   },
   "paths": {
-    "sources": "./contracts",
-    "cache": "./cache",
-    "artifacts": "./artifacts"
-  }
+    "artifacts": "./node_modules"
+  },
+  "networks": {
+    "wellesley": {
+      "chainId": 5904,
+      "url": "https://localhost",
+      "accounts": [
+        "0x3291cb7f023c39770aec876362f41e45d20168fd49320baa8027931aa884d415"
+      ]
+    }
+  },
+  "defaultNetwork": "wellesley"
 }

@@ -1,95 +1,76 @@
 #!/bin/bash
 scriptPath=$(dirname $(realpath $0))
-environmentFile=$1
+gethPath=$($scriptPath/install-geth.sh)
+bootnode="$gethPath/bootnode"
+chainName=$1
+domain=$2
+
+dockerPath="$scriptPath/docker"
+chainDir="$scriptPath/chains/$chainName"
+if [ ! -d $chainDir ]
+then
+  echo "Chain $chainName does not exist" && exit 1
+fi
 
 # Create the .env file needed by dockerfile
-touch $scriptPath/.env && echo -n "" > $scriptPath/.env
+envFile=$dockerPath/.env
+touch $envFile && echo -n "" > $envFile
+echo "HOST_DIR=$scriptPath/host" >> $envFile
 
-composeFileArgs="-f $scriptPath/docker-compose.yml"
+composeFileArgs="-f $dockerPath/docker-compose.yml -f $dockerPath/rpc.yml"
 
-domain=$(jq -r '.domain' $environmentFile)
-certFullchain=$(jq -r '.fullchain' $environmentFile)
-certPrivkey=$(jq -r '.privkey' $environmentFile)
-if [ "$domain" != 'null' ] &&\
-   [ "$certFullchain" != 'null' ] &&\
-   [ "$certPrivkey" != 'null' ]
+certs="/etc/letsencrypt/live/$domain"
+fullchain="$certs/fullchain.pem"
+privkey="$certs/privkey.pem"
+
+if [ ! -z "$domain" ] && sudo test -f "$fullchain" && sudo test -f "$privkey"
 then
-  composeFileArgs="$composeFileArgs -f $scriptPath/ssl.yml"
-  echo "DOMAIN=$domain" >> $scriptPath/.env
-  echo "CERT_FULLCHAIN=$certFullchain" >> $scriptPath/.env
-  echo "CERT_PRIVKEY=$certPrivkey" >> $scriptPath/.env
+  composeFileArgs="$composeFileArgs -f $dockerPath/ssl.yml"
+  echo "DOMAIN=$domain" >> $envFile
+  echo "CERT_FULLCHAIN=$fullchain" >> $envFile
+  echo "CERT_PRIVKEY=$privkey" >> $envFile
   echo "Writing nginx config for $domain"
-  cat $scriptPath/http.conf.template | sed -e "s/{{DOMAIN}}/$domain/" > $scriptPath/http.conf
+  cat $scriptPath/templates/http.rpc.conf.template | sed -e "s/{{DOMAIN}}/$domain/" > $scriptPath/host/http.conf
 else
   echo "Writing nginx config, no ssl"
-  cat $scriptPath/http.conf.nossl.template > $scriptPath/http.conf
+  cat $scriptPath/templates/http.conf.nossl.template > $scriptPath/host/http.conf
 fi
 
-genesisFile="genesis.json"
+headscaleConfig="$scriptPath/host/headscale/config"
+if [ -d "$headscaleConfig" ]
+then
+  composeFileArgs="$composeFileArgs -f $dockerPath/headscale.yml"
+  echo "HEADSCALE_PATH=$headscaleConfig" >> $envFile
+fi
+
+genesisFileName=genesis.json
+genesisFile="$chainDir/$genesisFileName"
 chainId=$(jq -r '.config.chainId' $genesisFile)
-bootnodeKey=$(jq -r '.bootnodeKey' $environmentFile)
-bootnodeEnode=$(jq -r '.bootnodeEnode' $environmentFile)
-if\
-  [ -f $genesisFile ] &&\
-  [ "$chainId" != 'null' ] &&\
-  [ "$bootnodeKey" != 'null' ] &&\
-  [ "$bootnodeEnode" != 'null' ]
+bootnodeKey=$(cat $chainDir/bootnode.key)
+bootnodeEnode=$($bootnode -nodekeyhex $bootnodeKey -writeaddress)
+echo "CHAIN_DIR=$chainDir" >> $envFile
+echo "CHAIN_ID=$chainId" >> $envFile
+echo "BOOTNODE_ENODE=$bootnodeEnode" >> $envFile
+
+sealerAccount=$(jq -r '.extraData|split("x")[1][64:104]' $chainDir/genesis.json)
+sealerAccountHex=$sealerAccount
+sealerKeystore=$(find $chainDir -type f -iname "*$sealerAccount" | head -n 1)
+sealerPassword=$chainDir/password.txt
+if [ -f "$sealerKeystore" ] && [ -f "$sealerPassword" ]
 then
-  composeFileArgs="$composeFileArgs -f $scriptPath/rpc.yml"
-  echo "GENESIS_FILE=$genesisFile" >> $scriptPath/.env
-  echo "CHAIN_ID=$chainId" >> $scriptPath/.env
-  echo "BOOTNODE_KEY=$bootnodeKey" >> $scriptPath/.env
-  echo "BOOTNODE_ENODE=$bootnodeEnode" >> $scriptPath/.env
-else
-  echo "Genesis file and bootnode information required to start blockchain" && exit 1
+  composeFileArgs="$composeFileArgs -f $dockerPath/sealer.yml"
+  echo "SEALER_ACCOUNT=$sealerAccountHex" >> $envFile
+
+  sealerKeystoreFileName=$(basename $sealerKeystore)
+  echo "SEALER_KEYSTORE=$sealerKeystoreFileName" >> $envFile
 fi
 
-sealerAccount=$(jq -r '.sealerAccount' $environmentFile)
-sealerKeystore=$(jq -r '.sealerKeystore' $environmentFile)
-sealerPassword=$(jq -r '.sealerPassword' $environmentFile)
-if\
-  [ "$sealerAccount" != 'null' ] &&\
-  [ "$sealerKeystore" != 'null' ] &&\
-  [ "$sealerPassword" != 'null' ]
+applicationPath=~/hyphen
+if [ -d "$applicationPath" ]
 then
-  composeFileArgs="$composeFileArgs -f $scriptPath/sealer.yml"
-  echo "SEALER_ACCOUNT=$sealerAccount" >> $scriptPath/.env
-  echo "SEALER_KEYSTORE=$sealerKeystore" >> $scriptPath/.env
-  echo "SEALER_PASSWORD=$sealerPassword" >> $scriptPath/.env
-else
-  echo "No sealing account specified, skipping sealing node"
+  composeFileArgs="$composeFileArgs -f $dockerPath/application.yml"
+  echo "APPLICATION_PATH=$applicationPath" >> $envFile
 fi
 
-applicationPath=$(jq -r '.applicationPath' $environmentFile)
-if [ "$applicationPath" != 'null' ]
-then
-  composeFileArgs="$composeFileArgs -f $scriptPath/application.yml"
-  echo "APPLICATION_PATH=$applicationPath" >> $scriptPath/.env
-else
-  echo "No application path specified, skipping nginx application volume"
-fi
-
-headscaleConfig=$(jq -r '.headscaleConfig' $environmentFile)
-if [ "$headscaleConfig" != 'null' ]
-then
-  composeFileArgs="$composeFileArgs -f $scriptPath/headscale.yml"
-  echo "HEADSCALE_PATH=$headscaleConfig" >> $scriptPath/.env
-  cat $scriptPath/headscale-config.yaml.template | sed -e "s/{{DOMAIN}}/$domain/" > $headscaleConfig/config.yaml
-  docker compose -f headscale.yml up -d && docker compose -f headscale.yml exec -it headscale headscale namespaces create nodes
-fi
-
-docker compose\
-  $composeFileArgs\
-  up -d
-
-# blockchainUrl=$(jq -r '.blockchainUrl' $environmentFile)
-# status=$(curl $blockchainUrl)
-# TODO: This while loop doesn't quite work...e.g.when DNS is not set up correctly
-# while [ ! -z $status ]
-# do
-#   echo "Waiting for blockchain to come online."
-#   sleep 2
-#   status=$(curl $blockchainUrl)
-# done
-
-# echo "Blockchain online."
+echo "$composeFileArgs"
+docker compose $composeFileArgs up

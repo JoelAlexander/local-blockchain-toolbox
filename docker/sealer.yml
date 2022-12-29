@@ -6,7 +6,7 @@ services:
     image: gethnode:latest
     command: [
       "--unlock", "${SEALER_ACCOUNT}",
-      "--password", "${SEALER_PASSWORD}",
+      "--password", "password.txt",
       "--mine",
       "--networkid", "${CHAIN_ID}",
       "--datadir", "/.ethereum",
@@ -19,9 +19,9 @@ services:
     ]
     volumes:
       - /.ethereum/
-      - ./${GENESIS_FILE}:/${GENESIS_FILE}
-      - ./${SEALER_KEYSTORE}:/.ethereum/${SEALER_KEYSTORE}
-      - ./${SEALER_PASSWORD}:/${SEALER_PASSWORD}
+      - ${CHAIN_DIR}/keystore/${SEALER_KEYSTORE}:/.ethereum/keystore/${SEALER_KEYSTORE}
+      - ${CHAIN_DIR}/genesis.json:/genesis.json
+      - ${CHAIN_DIR}/password.txt:/password.txt
     networks:
       geth-net:
         ipv4_address: 172.172.172.3
