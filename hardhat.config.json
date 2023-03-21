@@ -15,13 +15,21 @@
     "artifacts": "./node_modules"
   },
   "networks": {
-    "wellesley": {
-      "chainId": 5904,
-      "url": "https://localhost",
+    "joel": {
+      "chainId": 1234,
+      "url": "https://blockchain.one.localblockchain.xyz",
       "accounts": [
-        "0x3291cb7f023c39770aec876362f41e45d20168fd49320baa8027931aa884d415"
+        "0xf472bb62fe58a58c82d2d9e5ce34bd6d50626c8845591be450005bb6ea578ca2"
+      ],
+      "ensAddress": "0x9D5538A5b0233D54D04e66278a2FfFFe8E25432D"
+    },
+    "joel2": {
+      "chainId": 1234,
+      "url": "https://blockchain.one.localblockchain.xyz",
+      "accounts": [
+        "0x2b8bed41778eade272672ad055ef9c1efd160547eef8943d9cb7bab1bb33959e"
       ]
     }
   },
-  "defaultNetwork": "wellesley"
+  "defaultNetwork": "joel"
 }

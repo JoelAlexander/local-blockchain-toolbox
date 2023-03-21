@@ -4,26 +4,8 @@ const fs = require('fs')
 const path = require('node:path')
 const namehash = require('eth-ens-namehash')
 const config = require('./hardhat.config.json')
-
-async function sendEth(hre, amount, address) {
-  return waitForConfirmation((overrides) => {
-    return hre.localBlockchain.signer.sendTransaction({
-      to: address,
-      value: amount,
-      gasPrice: overrides.gasPrice
-    })
-  })
-}
-
-async function getPublicResolver(hre) {
-  const publicResolverAddress = await hre.localBlockchain.provider.resolveName('resolver')
-  const PublicResolver = await hre.ethers.getContractFactory(
-    "@ensdomains/ens-contracts/artifacts/contracts/resolvers/PublicResolver.sol:PublicResolver"
-  )
-  return PublicResolver.attach(publicResolverAddress).then((resolver) => {
-    return resolver.connect(hre.localBlockchain.signer)
-  })
-}
+const ethersUtils = require('ethers-utils')
+const { types } = require("hardhat/config")
 
 // Need to setup ENS like this
 // -  bytes32 public constant RESOLVER_LABEL = keccak256('resolver');
@@ -39,13 +21,8 @@ async function getPublicResolver(hre) {
 // -  function topLevelNode(bytes32 label) public pure returns (bytes32) {
 // -    return namehash(bytes32(0), label);
 // -  }
-// -    ens = new ENSRegistry();
 // -
-// -    bytes32 resolverNode = topLevelNode(RESOLVER_LABEL);
-// -    PublicResolver publicResolver = new PublicResolver(ens, INameWrapper(address(0)));
-// -    ens.setSubnodeOwner(bytes32(0), RESOLVER_LABEL, address(this));
-// -    ens.setResolver(resolverNode, address(publicResolver));
-// -    publicResolver.setAddr(resolverNode, address(publicResolver));
+
 // -
 // -    bytes32 reverseNode = topLevelNode(REVERSE_REGISTRAR_LABEL);
 // -    bytes32 reverseAddressNode = namehash(reverseNode, ADDR_LABEL);
@@ -59,14 +36,13 @@ async function getPublicResolver(hre) {
 // -    // Give the caller control over the rest of the namespace.
 // -    ens.setOwner(bytes32(0), msg.sender);
 
-async function getEnsRegistry(hre) {
-  const ENSRegistry = await hre.ethers.getContractFactory(
-    "@ensdomains/ens-contracts/artifacts/contracts/registry/ENSRegistry.sol:ENSRegistry"
-  )
-  return ENSRegistry.attach(hre.localBlockchain.provider.network.ensAddress).then((registry) => {
-    return registry.connect(hre.localBlockchain.signer)
-  })
-}
+
+// async function getEnsRegistry(hre) {
+
+//   return ENSRegistry.attach(hre.localBlockchain.provider.network.ensAddress).then((registry) => {
+//     return registry.connect(hre.localBlockchain.signer)
+//   })
+// }
 
 async function setPublicResolverAddr(hre, node, address) {
   const publicResolver = await getPublicResolver(hre)
@@ -80,13 +56,6 @@ async function setPublicResolver(hre, node) {
   const publicResolver = await getPublicResolver(hre)
   return waitForConfirmation((overrides) => {
     return ensRegistry.setResolver(node, publicResolver.address, overrides)
-  })
-}
-
-async function setSubnodeOwner(hre, node, label, owner) {
-  const ensRegistry = await getEnsRegistry(hre)
-  return waitForConfirmation((overrides) => {
-    return ensRegistry.setSubnodeOwner(node, label, owner, overrides)
   })
 }
 
@@ -104,14 +73,14 @@ async function claimSubnodeAndSetAddr(node, label, subnode, addr) {
   })
 }
 
-function leafLabelAndNode(hre, name) {
+function labelAndNode(name) {
   const names = name.split('.')
-  if (names.lenth === 0) {
+  if (names.length === 0) {
     throw "Name must not be empty"
   }
   const leaf = names[0]
-  const label = hre.ethers.utils.id(leaf)
-  const nodeString = names.length === 1 ? '' : names.slice(1, names.length).join('.')
+  const label = ethersUtils.id(leaf)
+  const nodeString = names.slice(1, names.length).join('.')
   const node = namehash.hash(nodeString)
   return [label, node]
 }
@@ -120,8 +89,8 @@ async function createFifsTldNamespace(hre, tld) {
   const ensRegistry = await getEnsRegistry()
   const publicResolver = await getPublicResolver()
   const registrarName = `registrar.${tld}`
-  const [tldLabel, rootNode] = leafLabelAndNode(hre, tld)
-  const [registrarLabel, tldNode] = leafLabelAndNode(hre, registrarName)
+  const [tldLabel, rootNode] = labelAndNode(tld)
+  const [registrarLabel, tldNode] = labelAndNode(registrarName)
   const registrarNode = namehash.hash(registrarName)
   console.log(`Deploying new FIFSRegistrar`)
   return deployContract(hre, "FIFSRegistrar", ensRegistry.address, tldNode).then((contract) => {
@@ -144,21 +113,9 @@ async function createFifsTldNamespace(hre, tld) {
   })
 }
 
-function getDeployedContractAddress(address, nonce) {
-  return ethJsUtil.bufferToHex(
-    ethJsUtil.generateAddress(
-      ethJsUtil.toBuffer(address),
-      ethJsUtil.toBuffer(nonce)))
-}
-
 async function makeGenesis(taskArguments) {
-  const path = require('node:path')
-  const fs = require('fs');
-
   const chainId = parseInt(taskArguments.chainId)
   const sealerAddress = taskArguments.sealerAddress.replace("0x", "")
-  const genesisFilePath =  path.join(taskArguments.chainDir, 'genesis.json')
-  const configurationFilePath = path.join(taskArguments.chainDir, 'config.json')
 
   const creatorWallet = ethers.Wallet.createRandom()
   const extraData = `0x0000000000000000000000000000000000000000000000000000000000000000${sealerAddress}0000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000`
@@ -187,30 +144,35 @@ async function makeGenesis(taskArguments) {
     "alloc": {}
   }
 
-  const ensAddress = getDeployedContractAddress(creatorWallet.address, 0)
-  const creatorBalance = "1000000000000000000"
-  const faucetAlloc = "1000000000000000000000000"
   genesis.alloc[creatorWallet.address] = {
-    "balance": creatorBalance
+    // One million and one ETH
+    "balance": "1000001000000000000000000"
   }
 
-  genesis.alloc[getDeployedContractAddress(creatorWallet.address, 1)] = {
-    "balance": faucetAlloc
-  }
-
-  const configuration = {
-    ens: ensAddress,
+  const config = {
     creator: {
       address: creatorWallet.address,
       privateKey: creatorWallet.privateKey
     }
   }
 
-  fs.writeFileSync(configurationFilePath, JSON.stringify(configuration, null, 2))
-  fs.writeFileSync(genesisFilePath, JSON.stringify(genesis, null, 2))
+  console.log(JSON.stringify({
+    genesis: genesis,
+    config: config
+  }, null, 2))
 
-  return Promise.resolve(genesis)
+  return Promise.resolve()
 }
+
+task(
+  "makeGenesis",
+  "Makes the genesis file for the local blockchain",
+  async function (taskArguments, hre, runSuper) {
+    return makeGenesis(taskArguments)
+  }
+).addParam("chainId", "The chainId of the blockchain")
+.addParam("sealerAddress", "The public key of the intial sealer account")
+
 
 async function deployGenesis(hre, chainPath) {
 
@@ -237,7 +199,7 @@ async function deployGenesis(hre, chainPath) {
   await deployContract('ENSDeployment')
 
   console.log(`Claiming faucet and setting address to ${faucetAddress}`)
-  return await claimSubnodeAndSetAddr(publicNode, faucetLabel, faucetNode, faucetAddress)
+  return claimSubnodeAndSetAddr(publicNode, faucetLabel, faucetNode, faucetAddress)
 }
 
 function configureModule(taskArguments) {
@@ -350,45 +312,367 @@ async function deployModule(taskArguments, hre) {
 }
 
 task(
+  "getGasPrice",
+  "Gets the current gas price",
+  async function (taskArguments, hre, runSuper) {
+    const provider = await hre.run("getEnsProvider")
+    return provider.getGasPrice()
+  }
+)
+
+task(
   "checkBalance",
   "Checks the balance of the creator account",
   async function (taskArguments, hre, runSuper) {
-    const signer = hre.localBlockchain.signer
-    return signer.getBalance().then((balance) => {
-      console.log(`${signer.address}: ${balance}`)
+    const provider = await hre.run("getEnsProvider")
+    const signer = await hre.run("getEnsSigner")
+    const address = taskArguments.address ? taskArguments.address : signer.address
+    return provider.getBalance(address).then((balance) => {
+      console.log(`${address}: ${balance}`)
     })
+  }
+).addOptionalPositionalParam('address', 'Address to check balance of')
+
+task(
+  "executeTransaction",
+  "Executes the transaction",
+  async function (taskArguments, hre, runSuper) {
+    const gasPrice = await hre.run("getGasPrice")
+      .then((gasPrice) => {
+        // Overpay 40%
+        return gasPrice.add(gasPrice.div(40))
+      })
+    const signer = await hre.run("getEnsSigner")
+    const unsignedTransaction = taskArguments.transaction
+    unsignedTransaction.gasPrice = gasPrice
+    return signer.sendTransaction(taskArguments.transaction)
+      .then((response) => {
+        return response.wait().then((receipt) => {
+          return receipt
+        }, (err) => {
+          console.log(err)
+        })
+      }, (err) => {
+        console.log(err)
+      })
+  }
+).addParam('transaction', 'Transaction to send', undefined, types.json)
+
+task(
+  "getEnsRegistry",
+  "Gets the ENS registry for the active chain",
+  async function (taskArguments, hre, runSuper) {
+    if (!hre.network.config.ensAddress) {
+      return Promise.resolve(null)
+    }
+
+    return hre.run(
+      "getDeployedContract",
+      { contractName: "@ensdomains/ens-contracts/artifacts/contracts/registry/ENSRegistry.sol:ENSRegistry",
+        address: hre.network.config.ensAddress }
+    )
+  }
+)
+
+task(
+  "getEnsProvider",
+  "Gets an ENS enabled provider for the active chain",
+  async function (taskArguments, hre, runSuper) {
+
+    return hre.run(
+      "getEnsRegistry"
+    ).then((ensRegistry) => {
+      const providerConfig = {
+        name: hre.network.name,
+        chainId: hre.network.config.chainId
+      }
+      if (ensRegistry) {
+        providerConfig.ensAddress = ensRegistry.address
+      }
+      const provider = new hre.ethers.providers.JsonRpcProvider({
+        url: hre.network.config.url
+      }, providerConfig)
+      return provider
+    })
+  }
+)
+
+task(
+  "getEnsSigner",
+  "Gets an ENS enabled signer for the active chain",
+  async function (taskArguments, hre, runSuper) {
+
+    if (!hre.network.config.accounts || hre.network.config.accounts.length < 1) {
+      console.log(`No account found for chain ${hre.network.name}`)
+      return Promise.resolve()
+    }
+
+    return hre.run(
+      "getEnsProvider"
+    ).then((ensProvider) => {
+      return new hre.ethers.Wallet(hre.network.config.accounts[0], ensProvider)
+    })
+  }
+)
+
+task(
+  "getContractFactory",
+  "Gets a contract factory",
+  async function (taskArguments, hre, runSuper) {
+    return hre.ethers.getContractFactory(taskArguments.contractName)
+  }
+)
+.addParam("contractName", "The name or fully qualified name of the contract")
+
+task(
+  "getDeployedContract",
+  "Gets a contract factory",
+  async function (taskArguments, hre, runSuper) {
+    return hre.run(
+      "getContractFactory",
+      { contractName: taskArguments.contractName }).then((contractFactory) => {
+        return contractFactory.attach(taskArguments.address)
+      })
+  }
+)
+.addParam("contractName", "The name or fully qualified name of the contract")
+.addParam("address", "The address of the deployed contract")
+
+task(
+  "getPublicResolver",
+  "Gets the public ENS resolver contract",
+  async function (taskArguments, hre, runSuper) {
+    const signer = await hre.run("getEnsSigner")
+    const resolverAddress = await hre.run("resolveName", { name: 'resolver' })
+    const returnVal = resolverAddress === null ? null :
+      await hre.run("getDeployedContract", {
+        contractName: "@ensdomains/ens-contracts/artifacts/contracts/resolvers/PublicResolver.sol:PublicResolver",
+        address: resolverAddress
+      }).then((contract) => { contract })
+    console.log(returnVal)
+    return returnVal
   }
 )
 
 task(
   "resolveName",
-  "Resolves the name on ENS",
+  "Resolves a name on the network's ENS instance",
   async function (taskArguments, hre, runSuper) {
-    const provider = hre.localBlockchain.provider
-    return provider.resolveName(taskArguments.name).then((address) => {
-      console.log(`${taskArguments.name}: ${address}`)
+    const provider = await hre.run("getEnsProvider")
+    return provider.resolveName(taskArguments.name).then(console.log)
+  }
+).addParam("name", "Name to resolve")
+
+task(
+  "deployContract",
+  "Deploys a contract",
+  async function (taskArguments, hre, runSuper) {
+    const args = taskArguments.args ? taskArguments.args : []
+    const contractName = taskArguments.contractName
+    const gasPrice = await hre.run("getGasPrice")
+    const contractFactory = await hre.run("getContractFactory", { contractName: contractName })
+    const contract = await contractFactory.deploy(...args, { gasPrice: gasPrice })
+    return contract.deployTransaction.wait().then(() => {
+      return contract
     })
   }
-).addParam("name", "The name to resolve")
+).addParam("contractName", "The name or fully qualified name of the contract")
+.addOptionalVariadicPositionalParam("args", "Additional contract constructor arguments")
 
 task(
-  "makeGenesis",
-  "Makes the genesis file for the local blockchain",
+  "deployEnsRegistry",
+  "Deploys an Ens registry.",
   async function (taskArguments, hre, runSuper) {
-    return makeGenesis(taskArguments)
-  }
-).addParam("chainId", "The chainId of the blockchain")
-.addParam("sealerAddress", "The public key of the intial sealer account")
-.addParam("chainDir", "The path to the chain directory")
 
-task(
-  "deployGenesis",
-  "Deploys the first contracts onto a fresh blockchain.",
-  async function (taskArguments, hre, runSuper) {
-    return deployGenesis(hre, taskArguments.chainDir)
+    const [resolverLabel,] = labelAndNode('resolver')
+    const resolverNode = namehash.hash('resolver')
+    const [reverseLabel,] = labelAndNode('reverse')
+    const [addrLabel, reverseNode] = labelAndNode('addr.reverse')
+    const reverseAddrNode = namehash.hash('addr.reverse')
+    const [deployerLabel,] = labelAndNode('deployer')
+    const deployerNode = namehash.hash('deployer')
+    const publicResolverContractName = "@ensdomains/ens-contracts/artifacts/contracts/resolvers/PublicResolver.sol:PublicResolver"
+
+    const exec = (pt) => {
+      return pt.then((t) => {
+        return hre.run("executeTransaction", { transaction: t})
+      })
+    }
+
+    const deployedEnsRegistry = await hre.run("getEnsRegistry")
+      .then((existingEnsRegistry) => {
+        if (existingEnsRegistry) {
+          return existingEnsRegistry
+        } else {
+          console.log(`Deploying ENS Registry`)
+          return hre.run(
+            "deployContract",
+            { contractName: "@ensdomains/ens-contracts/artifacts/contracts/registry/ENSRegistry.sol:ENSRegistry"}
+          ).then((newlyDeployedEnsRegistry) => {
+            hre.network.config.ensAddress = newlyDeployedEnsRegistry.address
+            return newlyDeployedEnsRegistry
+          })
+        }
+      })
+      
+    const ensSigner = await hre.run("getEnsSigner")
+    const ensRegistry = await Promise.resolve(deployedEnsRegistry)
+      .then((deployedEnsRegistry) => {
+        console.log(`Using ENSRegistry: ${deployedEnsRegistry.address}`)
+        return deployedEnsRegistry.connect(ensSigner)
+      })
+
+    const resolver = await hre.run("getResolver")
+      .then((existingResolver) => {
+        if (existingResolver) {
+          return hre.run('getDeployedContract', {
+            contractName: publicResolverContractName,
+            address: existingResolver.address })
+        } else {
+          console.log(`Deploying resolver`)
+          return hre.run(
+            "deployContract",
+            { contractName: publicResolverContractName , args: [ ensRegistry.address ]})
+            .then((deployedResolver) => {
+              console.log(`Claiming name: resolver`)
+              return hre.run(
+                "claimSubnode",
+                { name: 'resolver' })
+              .then(() => {
+                console.log(`Setting resolver of node 'resolver' to ${deployedResolver.address}`)
+                return exec(ensRegistry.populateTransaction.setResolver(resolverNode, deployedResolver.address))
+                .then(() => {
+                  console.log(`Setting address of resolver to ${deployedResolver.address}`)
+                  return exec(deployedResolver.populateTransaction['setAddr(bytes32,address)'](resolverNode, deployedResolver.address))
+                  .then(() => {
+                    return deployedResolver
+                  })
+                })
+              }) 
+            })
+        }
+      })
+      .then((deployedResolver) => {
+        console.log(`Using resolver: ${deployedResolver.address}`)
+        return deployedResolver.connect(ensSigner)
+      })
+
+    const reverseRegistrar = await ensSigner.resolveName('addr.reverse')
+      .then((existingReverseRegistrar) => {
+        const reverseRegistrarContractName = '@ensdomains/ens-contracts/artifacts/contracts/registry/ReverseRegistrar.sol:ReverseRegistrar'
+        if (existingReverseRegistrar) {
+          return hre.run('getDeployedContract',
+            { contractName: reverseRegistrarContractName,
+              address: existingReverseRegistrar })
+        } else {
+          console.log(`Deploying reverse registrar`)
+          return hre.run(
+            'deployContract',
+            { contractName: reverseRegistrarContractName, args: [ ensRegistry.address, resolver.address ]})
+            .then((deployedReverseRegistrar) => {
+              console.log(`Claiming name: reverse`)
+              return hre.run('claimSubnode', { name: 'reverse' })
+                .then(() => {
+                  console.log(`Claiming name: addr.reverse`)
+                  return hre.run('claimSubnode', { name: 'addr.reverse'})
+                })
+                .then(() => {
+                  console.log(`Setting resolver of node 'addr.resolver' to ${resolver.address}`)
+                  return exec(ensRegistry.populateTransaction.setResolver(reverseAddrNode, resolver.address))
+                })
+                .then(() => {
+                  console.log(`Setting address of reverse registrar`)
+                  return exec(resolver.populateTransaction['setAddr(bytes32,address)'](reverseAddrNode, deployedReverseRegistrar.address))
+                })
+                .then(() => {
+                  console.log(`Setting ownership of addr.reverse to reverse registrar`)
+                  return hre.run('setSubnodeOwner', { name: 'addr.reverse', owner: deployedReverseRegistrar.address })
+                })
+                .then(() => { return deployedReverseRegistrar })
+            })
+        }
+      })
+      .then((deployedReverseRegistrar) => {
+        console.log(`Using reverse registrar: ${deployedReverseRegistrar.address}`)
+        return deployedReverseRegistrar.connect(ensSigner)
+      })
+
+    console.log(`Claiming name: deployer`)
+    await hre.run('claimSubnode', { name: 'deployer' })
+
+    console.log(`Setting address for deployer to: ${ensSigner.address}`)
+    await exec(resolver.populateTransaction['setAddr(bytes32,address)'](deployerNode, ensSigner.address))
+
+    console.log(`Setting name as deployer in reverse registrar`)
+    await exec(reverseRegistrar.populateTransaction.setName('deployer'))
+
+    console.log(`Setting resolver of deployer to public resolver`)
+    await exec(ensRegistry.populateTransaction.setResolver(deployerNode, resolver.address))
+
+    const ensSigner2 = await hre.run('getEnsSigner')
+    const resolvedDeployer = await ensSigner2.resolveName('deployer')
+    console.log(`Resolved deployer to: ${resolvedDeployer}`)
   }
 )
-.addParam("chainDir", "The path to the chain directory")
+
+task(
+  "setSubnodeOwner",
+  "Sets the owner of an ENS subnode",
+  async function (taskArguments, hre, runSuper) {
+    const signer = await hre.run("getEnsSigner")
+    const ensRegistry = await hre.run("getEnsRegistry").then((registry) => registry.connect(signer))
+    const gasPrice = await hre.run("getGasPrice")
+    const [label, node] = labelAndNode(taskArguments.name)
+    const transaction = await ensRegistry.populateTransaction.setSubnodeOwner(node, label, taskArguments.owner)
+    return hre.run("executeTransaction", { transaction: transaction })
+  }
+).addParam("name", "The name of the node")
+.addParam("owner", "The address of the new owner")
+
+task(
+  "getResolver",
+  "Gets the resolver",
+  async function (taskArguments, hre, runSuper) {
+    const name = taskArguments.name ? taskArguments.name : 'resolver'
+    const provider = await hre.run("getEnsProvider")
+    return provider.getResolver(name)
+  }
+).addOptionalParam("name", "The name of the node to get the resolver of.  Defaults to public resolver: 'resolver'")
+
+task(
+  "setResolver",
+  "Sets the resolver of an ENS subnode",
+  async function (taskArguments, hre, runSuper) {
+    const signer = await hre.run("getEnsSigner")
+    const ensRegistry = await hre.run("getResolver").then((registry) => registry.connect(signer))
+    const gasPrice = await hre.run("getGasPrice")
+    const [label, node] = labelAndNode(taskArguments.name)
+    const transaction = ensRegistry.setResolver(node, taskArguments.resolver, { gasPrice: gasPrice })
+    return waitForConfirmation(transaction)
+  }
+).addParam("name", "The name of the node")
+.addParam("resolver", "The address of the resolver")
+
+task(
+  "getOwner",
+  "Gets the owner of an ENS node",
+  async function (taskArguments, hre, runSuper) {
+    const ensRegistry = await hre.run("getEnsRegistry")
+    return ensRegistry.owner(namehash.hash(taskArguments.name)).then(console.log)
+  }
+).addParam("name", "ENS name")
+
+task(
+  "claimSubnode",
+  "Claims the ENS subnode",
+  async function (taskArguments, hre, runSuper) {
+    const signer = await hre.run("getEnsSigner")
+    return hre.run("setSubnodeOwner", {
+      name: taskArguments.name,
+      owner: signer.address
+    })
+  }
+).addParam("name", "The name of the node")
 
 task(
   "configureModule",
@@ -413,35 +697,33 @@ task(
   "sendEth",
   "Sends ether from the creator account to the specified address",
   async function (taskArguments, hre, runSuper) {
-    return sendEth(taskArguments.amount, taskArguments.address)
+    const signer = await hre.run("getEnsSigner")
+    const gasPrice = await hre.run("getGasPrice")
+    const transaction = signer.sendTransaction({
+        to: taskArguments.address,
+        value: taskArguments.amount,
+        gasPrice: gasPrice
+    })
+    return waitForConfirmation(transaction)
   }
 )
 .addParam("amount", "The amount in eth")
 .addParam("address", "The receipient address")
 
+task(
+  "foo",
+  "bar",
+  async function (taskArguments, hre, runSuper) {
+    return hre.run("getOwner", { name: taskArguments.name }).then(console.log)
+  }
+).addParam("name", "The name of the node")
+
 // Local blockchain harhat plugin
-async function checkGasPrice() {
-  return this.ethers.provider.getGasPrice().then((gasPrice) => {
-    // Overpay 40% TODO: remove
-    return gasPrice.add(gasPrice.div(40))
-  })
-}
-
-async function deployContract(contractName, ...args) {
-  const contractFactory = await this.ethers.getContractFactory(contractName)
-  const gasPrice = await this.checkGasPrice()
-  const contract = await contractFactory.deploy(...args, { gasPrice: gasPrice })
-  console.log(`${contractName} deploying to: ${contract.address}`)
-  return contract.deployTransaction.wait().then(() => {
-    console.log(`${contractName} deployment confirmed`)
-    return contract
-  })
-}
-
-async function deployModuleContract(signer, modulePath, contractName, ...args) {
+async function deployModuleContract(hre, modulePath, contractName, ...args) {
+  const signer = await hre.ethers.getSigner()
   const contractData = require(path.join(modulePath, "artifacts", "contracts", `${contractName}.sol`, `${contractName}.json`))
   const contractFactory = new ethers.ContractFactory(contractData.abi, contractData.bytecode, signer)
-  const gasPrice = await this.checkGasPrice()
+  const gasPrice = await hre.run("getGasPrice")
   const contract = await contractFactory.deploy(...args, { gasPrice: gasPrice })
   console.log(`${contractName} deploying to: ${contract.address}`)
   return contract.deployTransaction.wait().then(() => {
@@ -450,21 +732,8 @@ async function deployModuleContract(signer, modulePath, contractName, ...args) {
   })
 }
 
-async function deployContract(contractName, ...args) {
-  const contractFactory = await this.ethers.getContractFactory(contractName)
-  const gasPrice = await this.checkGasPrice()
-  const contract = await contractFactory.deploy(...args, { gasPrice: gasPrice })
-  console.log(`${contractName} deploying to: ${contract.address}`)
-  return contract.deployTransaction.wait().then(() => {
-    console.log(`${contractName} deployment confirmed`)
-    return contract
-  })
-}
-
-async function waitForConfirmation(transactionFactory) {
-  const gasPrice = await this.checkGasPrice()
-
-  return transactionFactory({ gasPrice: gasPrice }).then((response) => {
+async function waitForConfirmation(transaction) {
+  return transaction.then((response) => {
     return response.wait().then((receipt) => {
       return receipt
     }, (err) => {
@@ -474,34 +743,5 @@ async function waitForConfirmation(transactionFactory) {
     console.log(err)
   })
 }
-
-// extendEnvironment((hre) => {
-//   if (!hre.config.chain) {
-//     console.log(`No chain configured`)
-//     return
-//   }
-
-//   const genesis = require(path.join(__dirname, 'chains', `${hre.config.chain.name}/genesis.json`))
-//   const chainConfig = require(path.join(__dirname, 'chains', `${hre.config.chain.name}/config.json`))
-
-//   hre.config.network[hre.config.chain.name] = {
-//     chainId: genesis.config.chainId,
-//     url: hre.config.chain.url,
-//     accounts: [ chainConfig.creator.privateKey ]
-//   }
-//   hre.defaultNetwork = hre.config.chain.name
-// })
-
-
-extendEnvironment((hre) => {
-
-  const chainConfig = require(path.join(__dirname, 'chains', `${hre.config.defaultNetwork}/config.json`))
-  // hre.ethers.provider = new hre.ethers.providers.JsonRpcProvider({
-  //   url: hre.ethers.provider.url
-  // }, {
-  //   ...hre.ethers.provider.network,
-  //   ensAddress: chainConfig.ens
-  // })
-})
 
 module.exports = config;

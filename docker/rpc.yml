@@ -24,7 +24,7 @@ services:
       "--nodekey", "bootnode.key"
     ]
     volumes:
-      - /.ethereum/
+      - ${CHAIN_DIR}/rpc/.ethereum/:/.ethereum/
       - ${CHAIN_DIR}/genesis.json:/genesis.json
       - ${CHAIN_DIR}/bootnode.key:/bootnode.key
     expose:

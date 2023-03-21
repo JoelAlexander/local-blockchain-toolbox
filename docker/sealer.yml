@@ -18,8 +18,7 @@ services:
       "--txpool.pricebump", "5"
     ]
     volumes:
-      - /.ethereum/
-      - ${CHAIN_DIR}/keystore/${SEALER_KEYSTORE}:/.ethereum/keystore/${SEALER_KEYSTORE}
+      - ${CHAIN_DIR}/sealer/.ethereum/:/.ethereum/
       - ${CHAIN_DIR}/genesis.json:/genesis.json
       - ${CHAIN_DIR}/password.txt:/password.txt
     networks:

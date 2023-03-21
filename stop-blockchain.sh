@@ -15,16 +15,16 @@ fi
 
 composeFileArgs="-f $dockerPath/docker-compose.yml -f $dockerPath/rpc.yml"
 
-certs="/etc/letsencrypt/live/$domain"
-fullchain="$certs/fullchain.pem"
-privkey="$certs/privkey.pem"
+certs=$(sudo certbot certificates -d "$domain")
+fullchain=$(echo "$certs" | awk -F ':' '$1 ~ /Certificate Path/ { print $2; exit }')
+privkey=$(echo "$certs" | awk -F ':' '$1 ~ /Private Key Path/ { print $2; exit }')
 if sudo test -f "$fullchain" && sudo test -f "$privkey"
 then
   composeFileArgs="$composeFileArgs -f $dockerPath/ssl.yml"
 fi
 
 sealerAccount=$(jq -r '.extraData|split("x")[1][64:104]' $chainDir/genesis.json)
-sealerKeystore=$(find $chainDir -type f -iname "*$sealerAccount" | head -n 1)
+sealerKeystore=$(sudo find $chainDir -type f -iname "*$sealerAccount" | head -n 1)
 sealerPassword=$chainDir/password.txt
 if [ -f "$sealerKeystore" ] && [ -f "$sealerPassword" ]
 then
@@ -43,6 +43,8 @@ then
   composeFileArgs="$composeFileArgs -f $dockerPath/headscale.yml"
 fi
 
+# This might be split into a script which creates the compose args and two calling scripts
+# For stop and remove.  That eliminates the 
 if [ "$mode" = 'stop' ]
 then
   docker compose $composeFileArgs stop

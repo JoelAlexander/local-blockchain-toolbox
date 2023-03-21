@@ -19,11 +19,10 @@ echo "HOST_DIR=$scriptPath/host" >> $envFile
 
 composeFileArgs="-f $dockerPath/docker-compose.yml -f $dockerPath/rpc.yml"
 
-certs="/etc/letsencrypt/live/$domain"
-fullchain="$certs/fullchain.pem"
-privkey="$certs/privkey.pem"
-
-if [ ! -z "$domain" ] && sudo test -f "$fullchain" && sudo test -f "$privkey"
+certs=$(sudo certbot certificates -d "$domain")
+fullchain=$(echo "$certs" | awk -F ':' '$1 ~ /Certificate Path/ { print $2; exit }')
+privkey=$(echo "$certs" | awk -F ':' '$1 ~ /Private Key Path/ { print $2; exit }')
+if [ ! -z $domain ] && sudo test -f $fullchain && sudo test -f $privkey;
 then
   composeFileArgs="$composeFileArgs -f $dockerPath/ssl.yml"
   echo "DOMAIN=$domain" >> $envFile
@@ -54,15 +53,11 @@ echo "BOOTNODE_ENODE=$bootnodeEnode" >> $envFile
 
 sealerAccount=$(jq -r '.extraData|split("x")[1][64:104]' $chainDir/genesis.json)
 sealerAccountHex=$sealerAccount
-sealerKeystore=$(find $chainDir -type f -iname "*$sealerAccount" | head -n 1)
 sealerPassword=$chainDir/password.txt
-if [ -f "$sealerKeystore" ] && [ -f "$sealerPassword" ]
+if [ -f "$sealerPassword" ]
 then
   composeFileArgs="$composeFileArgs -f $dockerPath/sealer.yml"
   echo "SEALER_ACCOUNT=$sealerAccountHex" >> $envFile
-
-  sealerKeystoreFileName=$(basename $sealerKeystore)
-  echo "SEALER_KEYSTORE=$sealerKeystoreFileName" >> $envFile
 fi
 
 applicationPath=~/hyphen

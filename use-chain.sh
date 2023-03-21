@@ -25,9 +25,18 @@ then
   echo "Must have creator account" && exit 1
 fi
 
-jq --arg blockchainUrl "https://$domain"\
+jq --arg blockchainUrl "https://blockchain.$domain"\
   --argjson chainId "$chainId"\
   --arg chainName "$chainName"\
   --arg creatorPrivateKey "$creatorPrivateKey"\
   '.networks."\($chainName)" |= { "chainId": $chainId, "url": $blockchainUrl, "accounts": [ $creatorPrivateKey ] } | .defaultNetwork |= $chainName'\
   $scriptPath/hardhat.config.json | sponge $scriptPath/hardhat.config.json
+
+ensAddress=$(jq -r '.ensAddress' $chainConfig)
+if [ $ensAddress != 'null' ]
+then
+  jq --arg chainName "$chainName"\
+    --arg ensAddress "$ensAddress"\
+    '.networks."\($chainName)".ensAddress |= $ensAddress'\
+    $scriptPath/hardhat.config.json | sponge $scriptPath/hardhat.config.json
+fi
