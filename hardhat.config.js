@@ -113,19 +113,19 @@ task(
 
     const handleConfigurationEntry = (key) => {
       const value = manifest.configure[key]
-      if (value === "random-private-key") {
-        console.log(`Handling ${key}, ${value}`)
+      if (key === "houseWallet") {
+        console.log(`Handling ${key}`)
         const wallet = ethers.Wallet.createRandom()
         configuration[key] = wallet.privateKey
         console.log(`Funding new public account ${wallet.address} with 0.01 ETH`)
         return hre.run('sendEth', { to: wallet.address, value: "10000000000000000" })
       } else {
-        console.error(`Unsupported config: ${value}`)
+        console.error(`Unsupported config: ${key}`)
       }
     }
 
     if (manifest.configure) {
-      const configurationKeys = Object.keys(manifest.configure)
+      const configurationKeys = Object.keys(manifest.resources)
       for (var i = 0; i < configurationKeys.length; i++) {
         await handleConfigurationEntry(configurationKeys[i])
       }
