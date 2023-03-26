@@ -9,7 +9,7 @@
   },
   "devDependencies": {
     "@ensdomains/ens-contracts": "^0.0.3",
-    "@local-blockchain-toolbox/contract-primitives": "^1.0.9",
+    "@local-blockchain-toolbox/contract-primitives": "^1.0.14",
     "@nomiclabs/hardhat-ethers": "^2.1.0",
     "@openzeppelin/contracts": "^4.7.2",
     "eth-ens-namehash": "^2.0.8",

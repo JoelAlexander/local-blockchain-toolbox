@@ -7,97 +7,58 @@ const config = require('./hardhat.config.json')
 const ethersUtils = require('ethers-utils')
 const { types } = require("hardhat/config")
 
-async function setPublicResolverAddr(hre, node, address) {
-  const publicResolver = await getPublicResolver(hre)
-  return waitForConfirmation((overrides) => {
-    return publicResolver['setAddr(bytes32,address)'](node, address, overrides)
-  })
-}
-
-async function setPublicResolver(hre, node) {
-  const ensRegistry = await getEnsRegistry(hre)
-  const publicResolver = await getPublicResolver(hre)
-  return waitForConfirmation((overrides) => {
-    return ensRegistry.setResolver(node, publicResolver.address, overrides)
-  })
-}
-
-async function claimSubnode(hre, node, label) {
-  return setSubnodeOwner(hre, node, label, signer.address)
-}
-
-
-
-function labelAndNode(name) {
-  const names = name.split('.')
-  if (names.length === 0) {
-    throw "Name must not be empty"
-  }
-  const leaf = names[0]
-  const label = ethersUtils.id(leaf)
-  const nodeString = names.slice(1, names.length).join('.')
-  const node = namehash.hash(nodeString)
-  return [label, node]
-}
-
-
-
-async function makeGenesis(taskArguments) {
-  const chainId = parseInt(taskArguments.chainId)
-  const sealerAddress = taskArguments.sealerAddress.replace("0x", "")
-
-  const creatorWallet = ethers.Wallet.createRandom()
-  const extraData = `0x0000000000000000000000000000000000000000000000000000000000000000${sealerAddress}0000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000`
-  const genesis = {
-    "config": {
-      "chainId": chainId,
-      "homesteadBlock": 0,
-      "eip150Block": 0,
-      "eip150Hash": "0x0000000000000000000000000000000000000000000000000000000000000000",
-      "eip155Block": 0,
-      "eip158Block": 0,
-      "byzantiumBlock": 0,
-      "constantinopleBlock": 0,
-      "petersburgBlock": 0,
-      "istanbulBlock": 0,
-      "berlinBlock": 0,
-      "londonBlock": 0,
-      "clique": {
-        "period": 6
-      }
-    },
-    "difficulty": "1",
-    "gasLimit": "8000000",
-    "extraData": extraData,
-    "nonce": "0x0",
-    "alloc": {}
-  }
-
-  genesis.alloc[creatorWallet.address] = {
-    // One million and one ETH
-    "balance": "1000001000000000000000000"
-  }
-
-  const config = {
-    creator: {
-      address: creatorWallet.address,
-      privateKey: creatorWallet.privateKey
-    }
-  }
-
-  console.log(JSON.stringify({
-    genesis: genesis,
-    config: config
-  }, null, 2))
-
-  return Promise.resolve()
-}
-
 task(
   "makeGenesis",
   "Makes the genesis file for the local blockchain",
   async function (taskArguments, hre, runSuper) {
-    return makeGenesis(taskArguments)
+    const chainId = parseInt(taskArguments.chainId)
+    const sealerAddress = taskArguments.sealerAddress.replace("0x", "")
+
+    const creatorWallet = ethers.Wallet.createRandom()
+    const extraData = `0x0000000000000000000000000000000000000000000000000000000000000000${sealerAddress}0000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000`
+    const genesis = {
+      "config": {
+        "chainId": chainId,
+        "homesteadBlock": 0,
+        "eip150Block": 0,
+        "eip150Hash": "0x0000000000000000000000000000000000000000000000000000000000000000",
+        "eip155Block": 0,
+        "eip158Block": 0,
+        "byzantiumBlock": 0,
+        "constantinopleBlock": 0,
+        "petersburgBlock": 0,
+        "istanbulBlock": 0,
+        "berlinBlock": 0,
+        "londonBlock": 0,
+        "clique": {
+          "period": 6
+        }
+      },
+      "difficulty": "1",
+      "gasLimit": "8000000",
+      "extraData": extraData,
+      "nonce": "0x0",
+      "alloc": {}
+    }
+
+    genesis.alloc[creatorWallet.address] = {
+      // One million and one ETH
+      "balance": "1000001000000000000000000"
+    }
+
+    const config = {
+      creator: {
+        address: creatorWallet.address,
+        privateKey: creatorWallet.privateKey
+      }
+    }
+
+    console.log(JSON.stringify({
+      genesis: genesis,
+      config: config
+    }, null, 2))
+
+    return Promise.resolve()
   }
 ).addParam("chainId", "The chainId of the blockchain")
 .addParam("sealerAddress", "The public key of the intial sealer account")
@@ -123,7 +84,7 @@ task(
             console.log(`Setting resolver for registrar.${tld} to the public resolver`)
             return hre.run('setPublicResolver', { name: registrarName }).then(() => {
               console.log(`Setting address for registrar.${tld} to FIFSRegistrar at ${contract.address}`)
-              return hre.run('setPublicResolverAddr', { name: registrarName, address: contract.address }).then(() => {
+              return hre.run('setPublicResolverAddress', { name: registrarName, address: contract.address }).then(() => {
                 console.log(`Changing owner of .${tld} to FIFSRegistrar at ${contract.address}`)
                 return hre.run('setSubnodeOwner', { name: tld, owner: contract.address }).then(() => {
                   console.log(`FIFSRegistrar 'registrar.${tld}' now owns .${tld} namespace`)
@@ -135,34 +96,6 @@ task(
       })
   }
 ).addParam("tld", "The top level ENS domain to create a FIFSRegistrar for")
-
-// async function deployGenesis(hre, chainPath) {
-
-//   const ensAddress = hre.localBlockchain.provider.network.ensAddress
-//   const provider = hre.localBlockchain.provider
-//   const ensDeployed = await provider.getCode(ensAddress)
-//   // Check to see if ens is deployed and if subsequent genesis contracts are deployed.
-//   if (ensDeployed) {
-//     console.error(`Genesis contracts already deployed.`)
-//     return Promise.resolve()
-//   }
-
-//   const signer = hre.localBlockchain.signer
-//   const transactionCount = await signer.getTransactionCount()
-//   if (transactionCount !== 0) {
-//     console.error(`Faucet deployment should be transaction #0 for the creator account`)
-//     return Promise.resolve()
-//   }
-  
-//   const faucetAddress = await deployContract('Faucet')
-
-//   const [faucetLabel, rootNode] = labelAndNode(hre, 'faucet')
-//   const faucetNode = hash('faucet')
-//   await deployContract('ENSDeployment')
-
-//   console.log(`Claiming faucet and setting address to ${faucetAddress}`)
-//   return hre.run('claimSubnodeAndSetAddr', { name: 'faucet', address: faucetAddress})
-// }
 
 task(
   "configureModule",
@@ -217,6 +150,9 @@ task(
     const manifestPath = path.join(modulePath, 'manifest.json')
     const manifest = require(manifestPath)
 
+    const deployedContracts = {};
+    const resources = {};
+
     const makeEnsName = (name) => {
       return `${name}.${manifest.name}`
     }
@@ -225,67 +161,72 @@ task(
       return Promise.reject(`name required in manifest`)
     }
 
-    // TODO: Verify the expected abi against the deployed contract
-    if (manifest.expect) {
-      const hasAllExpected = await Promise.all(
-        Object.keys(manifest.expect).map((key) => {
-          return provider.resolveName(key).then((resolved) => {
-            if (!resolved) {
-              console.error(`${key} is not mapped to an address, but expected by ${manifest.name}`)
-              return false
-            }
-            return true
-          })
-        })
-      ).then((all) => {
-        return all.reduce((prev, cur) => { return prev && cur }, true)
-      })
-
-      if (!hasAllExpected) {
-        return Promise.reject(`Missing expected contracts`)
+    if (manifest.resources) {
+      for (const resourceKey in manifest.resources) {
+        const resource = manifest.resources[resourceKey];
+        if (resource.type === "PrivateKey" && resource.options && resource.options.random) {
+          // Handle private key generation and assignment here
+          console.log("TODO: Handle public account")
+        } else {
+          return Promise.reject(`unsupported resource type ${resource.type} for resource ${resourceKey}`)
+        }
       }
     }
 
     if (manifest.namespaces) {
-      const keys = Object.keys(manifest.namespaces)
-      for (var i = 0; i < keys.length; i++) {
-        const key = keys[i]
-        const value = manifest.namespaces[key]
-        if (value === "FIFSRegistrar") {
-          await hre.run('createFifsTldNamespace', { tld: key })
+      for (const namespaceKey in manifest.namespaces) {
+        const namespace = manifest.namespaces[namespaceKey];
+        if (namespace.type === "FIFSRegistrar") {
+          await hre.run('createFifsTldNamespace', { tld: namespaceKey });
         } else {
-          return Promise.reject(`unsupported registrar type ${value} for namepspace ${key}`)
+          return Promise.reject(`unsupported registrar type ${namespace.type} for namespace ${namespaceKey}`);
         }
       }
     }
 
     if (manifest.deploy) {
-
-      const [nameLabel, rootNode] = labelAndNode(manifest.name)
-      console.log(`Claiming .${manifest.name}`)
+      console.log(`Claiming .${manifest.name}`);
       await hre.run('claimSubnode', { name: manifest.name }).then(() => {
-        console.log(`Deploying module contracts`)
-        const deployContractKeys = Object.keys(manifest.deploy)
-        const deployContractPromise = (key) => {
-          const value = manifest.deploy[key]
-          console.log(`Deploying contract ${value} to ${key}`)
-          return hre.run('deployModuleContract', { modulePath: taskArguments.modulePath, contractName: value }).then((contract) => {
-            const contractName = `${key}.${manifest.name}`
-            console.log(`Claiming ${contractName} and setting address to ${contract.address}`)
-            return hre.run('claimSubnodeAndSetAddr', { name: contractName, address: contract.address})
-          })
-        }
-        return deployContractKeys.reduce(
-          (prev, nextKey) => { return prev.then(() => { return deployContractPromise(nextKey) })},
-          Promise.resolve())
-      })
-    }
+        console.log(`Deploying module contracts`);
+        const deployContractKeys = Object.keys(manifest.deploy);
+        const deployContractPromise = async (key) => {
+          const contractConfig = manifest.deploy[key];
+          console.log(`Deploying contract ${contractConfig.source} to ${key}`);
+          const args = contractConfig.args ? contractConfig.args.map(arg => {
+            if (typeof arg === "string" && arg.startsWith("{") && arg.endsWith("}")) {
+              const referenceKey = arg.slice(1, -1);
+              // Replace the placeholder with the actual deployed contract address or resource value
+              // This assumes that the referenced contract/resource has already been deployed/created
+              return deployedContracts[referenceKey] || resources[referenceKey];
+            }
+            return arg;
+          }) : [];
 
-    console.log(`Module ${manifest.name} deployed`)
-    return Promise.resolve()
+          const contract = await hre.run('deployContract', {
+            modulePath: taskArguments.modulePath,
+            contractName: contractConfig.source,
+            args: args,
+          });
+
+          const contractName = `${key}.${manifest.name}`;
+          console.log(`Claiming ${contractName} and setting address to ${contract.address}`);
+          await hre.run('claimSubnodeAndSetAddr', { name: contractName, address: contract.address });
+
+          // Store the deployed contract address for reference in the args of other contracts
+          deployedContracts[key] = contract.address;
+        };
+
+      return deployContractKeys.reduce(
+        (prev, nextKey) => prev.then(() => deployContractPromise(nextKey)),
+        Promise.resolve(),
+      );
+    });
   }
-)
-.addParam('modulePath', 'The absolute path to the module.')
+
+  console.log(`Module ${manifest.name} deployed`);
+  return Promise.resolve();
+
+}).addParam('modulePath', 'The absolute path to the module.');
 
 task(
   "getGasPrice",
@@ -418,8 +359,8 @@ task(
   "getPublicResolver",
   "Gets the public ENS resolver contract",
   async function (taskArguments, hre, runSuper) {
-    const signer = await hre.run("getEnsSigner")
-    const resolverAddress = await hre.run("resolveName", { name: 'resolver' })
+    const provider = await hre.run("getEnsProvider")
+    const resolverAddress = await provider.resolveName('resolver')
     return resolverAddress === null ? null :
       await hre.run("getDeployedContract", {
         contractName: "@ensdomains/ens-contracts/artifacts/contracts/resolvers/PublicResolver.sol:PublicResolver",
@@ -433,48 +374,78 @@ task(
   "Resolves a name on the network's ENS instance",
   async function (taskArguments, hre, runSuper) {
     const provider = await hre.run("getEnsProvider")
-    return provider.resolveName(taskArguments.name)
+    return provider.resolveName(taskArguments.name).then(console.log)
   }
 ).addParam("name", "Name to resolve")
 
 task(
-  "deployContract",
-  "Deploys a contract",
+  "getModuleContractFactory",
+  "Loads a contract from a module",
   async function (taskArguments, hre, runSuper) {
-    const args = taskArguments.args ? taskArguments.args : []
-    const contractName = taskArguments.contractName
-    const gasPrice = await hre.run("getGasPrice")
-    const contractFactory = await hre.run("getContractFactory", { contractName: contractName })
-    const contract = await contractFactory.deploy(...args, { gasPrice: gasPrice })
-    return contract.deployTransaction.wait().then(() => {
-      return contract
-    })
-  }
-).addParam("contractName", "The name or fully qualified name of the contract")
-.addOptionalVariadicPositionalParam("args", "Additional contract constructor arguments")
-
-task(
-  "deployModuleContract",
-  "Deploys a contract from a module",
-  async function (taskArguments, hre, runSuper) {
-    const args = taskArguments.args ? taskArguments.args : []
     const signer = await hre.run('getEnsSigner')
     const contractName = taskArguments.contractName
     const contractNameParts = contractName.split('/')
     const contractData = contractName.startsWith('@') ?
       require(path.join(taskArguments.modulePath, "node_modules", contractNameParts[0], contractNameParts[1], "artifacts", "contracts", contractNameParts.slice(2, contractNameParts.length - 1).join('/'), `${contractNameParts[contractNameParts.length - 1]}.sol`, `${contractNameParts[contractNameParts.length - 1]}.json`)) :
       require(path.join(taskArguments.modulePath, "artifacts", "contracts", `${contractName}.sol`, `${contractName}.json`))
-    const contractFactory = new ethers.ContractFactory(contractData.abi, contractData.bytecode, signer)
-    const gasPrice = await hre.run("getGasPrice")
-    const contract = await contractFactory.deploy(...args, { gasPrice: gasPrice })
-    console.log(`${contractName} deploying to: ${contract.address}`)
-    return contract.deployTransaction.wait().then(() => {
-      console.log(`${contractName} deployment confirmed`)
-      return contract
-    })
+    return new ethers.ContractFactory(contractData.abi, contractData.bytecode, signer)
   }
 ).addParam("modulePath", "The path to the module")
 .addParam("contractName", "The contract name within the module")
+
+task(
+  "deployContract",
+  "Deploys a contract from a module",
+  async function (taskArguments, hre, runSuper) {
+    const args = taskArguments.args ? taskArguments.args : []
+    const contractFactory = taskArguments.modulePath ? 
+      await hre.run("getModuleContractFactory", { modulePath: taskArguments.modulePath, contractName: taskArguments.contractName }) :
+      await hre.run("getContractFactory", { contractName: taskArguments.contractName })
+    const gasPrice = await hre.run("getGasPrice")
+    const contract = await contractFactory.deploy(...args, { gasPrice: gasPrice })
+    console.log(`${taskArguments.contractName} deploying to: ${contract.address}`)
+    return contract.deployTransaction.wait().then(() => {
+      console.log(`${taskArguments.contractName} deployment confirmed`)
+      return contract
+    })
+  }
+).addParam("contractName", "The contract name within the module")
+.addOptionalParam("modulePath", "The path to the module")
+.addOptionalVariadicPositionalParam("args", "Additional contract constructor arguments")
+
+task(
+  "getDeployedModuleContract",
+  "Gets a contract factory",
+  async function (taskArguments, hre, runSuper) {
+    return hre.run(
+      "getModuleContractFactory",
+      { modulePath: taskArguments.modulePath, contractName: taskArguments.contractName, address: taskArguments.address }).then((contractFactory) => {
+        return contractFactory.attach(taskArguments.address)
+      })
+  }
+).addParam("modulePath", "The path to the module")
+.addParam("contractName", "The name or fully qualified name of the contract")
+.addParam("address", "The address of the deployed contract")
+
+task(
+  "callDeployedModuleContract",
+  "Call a deployed contract from a deployed module",
+  async function (taskArguments, hre, runSuper) {
+    const overrides = {}
+    const args = taskArguments.args ? taskArguments.args : []
+    if (taskArguments.value) {
+      overrides.value = taskArguments.value
+    }
+    const contract = await hre.run("getDeployedModuleContract", { modulePath: taskArguments.modulePath, contractName: taskArguments.contractName, address: taskArguments.address })
+    console.log(`Executing method: ${taskArguments.method} on ${taskArguments.contractName} at ${taskArguments.address} with a value of ${taskArguments.value}`)
+    const transaction = await contract.populateTransaction[taskArguments.method](...args, overrides)
+    return hre.run("executeTransaction", { transaction: transaction }).then(console.log)
+  }
+).addParam("modulePath", "The path to the module")
+.addParam("contractName", "The name or fully qualified name of the contract")
+.addParam("address", "The address of the deployed contract")
+.addParam("method", "The method name to call")
+.addOptionalParam("value", "The value to send in the contract")
 .addOptionalVariadicPositionalParam("args", "Additional contract constructor arguments")
 
 task(
@@ -482,13 +453,8 @@ task(
   "Deploys an Ens registry.",
   async function (taskArguments, hre, runSuper) {
 
-    const [resolverLabel,] = labelAndNode('resolver')
     const resolverNode = namehash.hash('resolver')
-    const [reverseLabel,] = labelAndNode('reverse')
-    const [addrLabel, reverseNode] = labelAndNode('addr.reverse')
     const reverseAddrNode = namehash.hash('addr.reverse')
-    const [deployerLabel,] = labelAndNode('deployer')
-    const deployerNode = namehash.hash('deployer')
     const publicResolverContractName = "@ensdomains/ens-contracts/artifacts/contracts/resolvers/PublicResolver.sol:PublicResolver"
 
     const exec = (pt) => {
@@ -601,6 +567,19 @@ task(
   "setSubnodeOwner",
   "Sets the owner of an ENS subnode",
   async function (taskArguments, hre, runSuper) {
+
+    const labelAndNode = (name) => {
+      const names = name.split('.')
+      if (names.length === 0) {
+        throw "Name must not be empty"
+      }
+      const leaf = names[0]
+      const label = ethersUtils.id(leaf)
+      const nodeString = names.slice(1, names.length).join('.')
+      const node = namehash.hash(nodeString)
+      return [label, node]
+    }
+
     const signer = await hre.run("getEnsSigner")
     const ensRegistry = await hre.run("getEnsRegistry").then((registry) => registry.connect(signer))
     const gasPrice = await hre.run("getGasPrice")
@@ -645,7 +624,7 @@ task(
 ).addParam("name", "The name of the node")
 
 task(
-  "setPublicResolverAddr",
+  "setPublicResolverAddress",
   "Sets the owner of an ENS subnode",
   async function (taskArguments, hre, runSuper) {
     const node = namehash.hash(taskArguments.name)
@@ -685,7 +664,7 @@ task(
   async function (taskArguments, hre, runSuper) {
     return hre.run("claimSubnode", { name: taskArguments.name })
       .then(() => hre.run("setPublicResolver", { name: taskArguments.name }))
-      .then(() => hre.run("setPublicResolverAddr", { name: taskArguments.name, address: taskArguments.address }))
+      .then(() => hre.run("setPublicResolverAddress", { name: taskArguments.name, address: taskArguments.address }))
   }
 ).addParam("name", "The name of the node")
 .addParam("address", "The address to set on the public resolver")
@@ -705,17 +684,5 @@ task(
   }
 ).addParam("to", "The address or ens name to send to")
 .addParam("value", "The value in wei to send")
-
-async function waitForConfirmation(transaction) {
-  return transaction.then((response) => {
-    return response.wait().then((receipt) => {
-      return receipt
-    }, (err) => {
-      console.log(err)
-    })
-  }, (err) => {
-    console.log(err)
-  })
-}
 
 module.exports = config;
