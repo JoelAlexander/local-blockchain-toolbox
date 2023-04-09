@@ -112,7 +112,7 @@ task(
     }
 
     const handleConfigurationEntry = (key) => {
-      const value = manifest.configure[key]
+      const value = manifest.resources[key]
       if (key === "houseWallet") {
         console.log(`Handling ${key}`)
         const wallet = ethers.Wallet.createRandom()
@@ -124,7 +124,7 @@ task(
       }
     }
 
-    if (manifest.configure) {
+    if (manifest.resources) {
       const configurationKeys = Object.keys(manifest.resources)
       for (var i = 0; i < configurationKeys.length; i++) {
         await handleConfigurationEntry(configurationKeys[i])
@@ -133,10 +133,6 @@ task(
 
     console.log(JSON.stringify(configuration))
     return Promise.resolve(JSON.stringify(configuration))
-    // const configurationPath = path.join(modulePath, "configuration.json")
-    // console.log(`Writing configuration.json to ${configurationPath}`)
-    // fs.writeFileSync(configurationPath, JSON.stringify(configuration, null, 2))
-    // return Promise.resolve()
   }
 )
 .addParam('modulePath', 'The absolute path to the module.')
@@ -385,9 +381,9 @@ task(
     const signer = await hre.run('getEnsSigner')
     const contractName = taskArguments.contractName
     const contractNameParts = contractName.split('/')
-    const contractData = contractName.startsWith('@') ?
-      require(path.join(taskArguments.modulePath, "node_modules", contractNameParts[0], contractNameParts[1], "artifacts", "contracts", contractNameParts.slice(2, contractNameParts.length - 1).join('/'), `${contractNameParts[contractNameParts.length - 1]}.sol`, `${contractNameParts[contractNameParts.length - 1]}.json`)) :
-      require(path.join(taskArguments.modulePath, "artifacts", "contracts", `${contractName}.sol`, `${contractName}.json`))
+    const moduleContractPath = path.join(taskArguments.modulePath, "artifacts", "contracts", `${contractName}.sol`, `${contractName}.json`)
+    const moduleDependencyContractPath = path.join(taskArguments.modulePath, "node_modules", contractNameParts[0] || '', contractNameParts[1] || '', "artifacts", "contracts", contractNameParts.slice(2, contractNameParts.length - 1).join('/'), `${contractNameParts[contractNameParts.length - 1]}.sol`, `${contractNameParts[contractNameParts.length - 1]}.json`)
+    const contractData = fs.existsSync(moduleContractPath) ? require(moduleContractPath) : require(moduleDependencyContractPath)
     return new ethers.ContractFactory(contractData.abi, contractData.bytecode, signer)
   }
 ).addParam("modulePath", "The path to the module")
@@ -421,7 +417,7 @@ task(
       "getModuleContractFactory",
       { modulePath: taskArguments.modulePath, contractName: taskArguments.contractName, address: taskArguments.address }).then((contractFactory) => {
         return contractFactory.attach(taskArguments.address)
-      })
+      }).then(console.log)
   }
 ).addParam("modulePath", "The path to the module")
 .addParam("contractName", "The name or fully qualified name of the contract")
