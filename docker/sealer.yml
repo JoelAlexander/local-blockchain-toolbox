@@ -14,7 +14,7 @@ services:
       "--netrestrict", "172.172.172.0/28",
       "--nat", "extip:172.172.172.3",
       "--ipcdisable",
-      "--syncmode", "snap",
+      "--syncmode", "full",
       "--gcmode", "full",
       "--txpool.lifetime", "12s",
       "--txpool.pricebump", "5"
