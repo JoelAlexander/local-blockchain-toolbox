@@ -18,6 +18,7 @@ services:
       "--bootnodes", "enode://${BOOTNODE_ENODE}@172.172.172.2:30303",
       "--netrestrict", "172.172.172.0/28,192.168.86.0/24",
       "--nat", "extip:172.172.172.2",
+      "--syncmode", "full",
       "--gcmode", "archive",
       "--txpool.lifetime", "12s",
       "--txpool.pricebump", "5",

@@ -198,15 +198,11 @@ task(
             return arg;
           }) : [];
 
-          const contract = await hre.run('deployContract', {
+          const contract = await hre.run('deployContractToSubnode', {
             modulePath: taskArguments.modulePath,
             contractName: contractConfig.source,
-            args: args,
-          });
-
-          const contractName = `${key}.${manifest.name}`;
-          console.log(`Claiming ${contractName} and setting address to ${contract.address}`);
-          await hre.run('claimSubnodeAndSetAddr', { name: contractName, address: contract.address });
+            name: `${key}.${manifest.name}`,
+            args: args });
 
           // Store the deployed contract address for reference in the args of other contracts
           deployedContracts[key] = contract.address;
@@ -664,6 +660,27 @@ task(
   }
 ).addParam("name", "The name of the node")
 .addParam("address", "The address to set on the public resolver")
+
+task(
+  "deployContractToSubnode",
+  "Deploys a contract and then claims the subnode and sets the address to the newly deployed contract",
+  async function (taskArguments, hre, runSuper) {
+    const contract = await hre.run('deployContract', {
+      modulePath: taskArguments.modulePath,
+      contractName: taskArguments.contractName,
+      args: taskArguments.args,
+    });
+
+    const contractName = taskArguments.name;
+    console.log(`Claiming ${contractName} and setting address to ${contract.address}`);
+    await hre.run('claimSubnodeAndSetAddr', { name: contractName, address: contract.address });
+    return contract
+  }
+)
+.addOptionalParam("modulePath", "The path to the module")
+.addParam("contractName", "The contract name within the module")
+.addParam("name", "The name of the node")
+.addOptionalVariadicPositionalParam("args", "Additional contract constructor arguments")
 
 task(
   "sendEth",
