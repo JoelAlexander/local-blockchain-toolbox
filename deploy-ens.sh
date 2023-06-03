@@ -28,7 +28,7 @@ then
   echo "Chain already configured with ENS: $ensAddress" && exit 1
 fi
 
-ensAddress=$(npx hardhat deployEnsRegistry)
+ensAddress=$(npx hardhat deployEns)
 if [ ! -z $ensAddress ]
 then
   jq --arg ensAddress "$ensAddress"\
