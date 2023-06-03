@@ -98,6 +98,16 @@ task(
 ).addParam("tld", "The top level ENS domain to create a FIFSRegistrar for")
 
 task(
+  "createFundedWallet",
+  "Creates and funds a wallet",
+  async function (taskArguments, hre, runSuper) {
+    const wallet = ethers.Wallet.createRandom()
+    console.log(`Funding new account ${wallet.address} with 1 ETH: ${wallet.privateKey}`)
+    return hre.run('sendEth', { to: wallet.address, value: "1000000000000000000" })
+  }
+);
+
+task(
   "configureModule",
   "Configures a local blockchain module for the current chain based on its manifest",
   async function (taskArguments, hre, runSuper) {
