@@ -179,17 +179,6 @@ task(
       }
     }
 
-    if (manifest.namespaces) {
-      for (const namespaceKey in manifest.namespaces) {
-        const namespace = manifest.namespaces[namespaceKey];
-        if (namespace.type === "FIFSRegistrar") {
-          await hre.run('createFifsTldNamespace', { tld: namespaceKey });
-        } else {
-          return Promise.reject(`unsupported registrar type ${namespace.type} for namespace ${namespaceKey}`);
-        }
-      }
-    }
-
     if (manifest.deploy) {
       console.log(`Claiming .${manifest.name}`);
       await hre.run('claimSubnode', { name: manifest.name }).then(() => {
@@ -223,6 +212,17 @@ task(
         Promise.resolve(),
       );
     });
+  }
+
+  if (manifest.namespaces) {
+    for (const namespaceKey in manifest.namespaces) {
+      const namespace = manifest.namespaces[namespaceKey];
+      if (namespace.type === "FIFSRegistrar") {
+        await hre.run('createFifsTldNamespace', { tld: namespaceKey });
+      } else {
+        return Promise.reject(`unsupported registrar type ${namespace.type} for namespace ${namespaceKey}`);
+      }
+    }
   }
 
   console.log(`Module ${manifest.name} deployed`);
