@@ -701,15 +701,16 @@ task(
   "deployContractToSubnode",
   "Deploys a contract and then claims the subnode and sets the address to the newly deployed contract",
   async function (taskArguments, hre, runSuper) {
-    const contractName = taskArguments.name;
-    console.log(`Claiming ${contractName}`);
-    await hre.run('claimSubnodeWithPublicResolver', { name: contractName });
+    const name = taskArguments.name;
+    console.log(`Claiming ${name}`);
+    await hre.run('claimSubnodeWithPublicResolver', { name: name });
     const contract = await hre.run('deployContract', {
       modulePath: taskArguments.modulePath,
       contractName: taskArguments.contractName,
       args: taskArguments.args,
     });
-    await hre.run("setAddress", { name: contractName, address: contract.address });
+    console.log(`Setting address of ${name} to ${contract.address}`)
+    await hre.run("setAddress", { name: name, address: contract.address });
     return contract
   }
 )
