@@ -117,22 +117,25 @@ task(
   "deployModule",
   "Deploys the module according to the manifest",
   async function (taskArguments, hre, runSuper) {
-    const provider = await hre.run('getEnsProvider')
+    const ensRegistry = await hre.run("getEnsRegistry");
+    const publicResolver = await hre.run("getPublicResolver");
     const modulePath = taskArguments.modulePath
     const manifestPath = path.join(modulePath, 'manifest.json')
     const manifest = require(manifestPath)
     const reservedKeys = { 'registrar' : true }
 
-    const deployedContracts = {};
-    const resources = {};
+    const deployedContracts = {
+      'ens': ensRegistry.address,
+      'resolver': publicResolver.address
+    };
     const deployContracts = taskArguments.deploy || [];
 
     const makeEnsName = (name) => {
       return `${name}.${manifest.name}`
     }
 
-    if(manifest.deploy && manifest.deploy.registrar){
-        return Promise.reject(`'registrar' is a reserved key and cannot be used in the deploy list.`);
+    if(manifest.deploy && (manifest.deploy.registrar || manifest.deploy.ens || manifest.deploy.resolver)){
+        return Promise.reject(`'registrar, ens, and resolver' are reserved keys and cannot be used in the deploy list.`);
     }
 
     if (manifest.namespace && manifest.namespace.type) {
@@ -140,7 +143,6 @@ task(
         // Adding the FIFSRegistrar into the deploy list.
         const ensRegistry = await hre.run('getEnsRegistry')
         const node = namehash.hash(manifest.name)
-
         manifest.deploy["registrar"] = {
             "source": "@ensdomains/ens-contracts/artifacts/contracts/registry/FIFSRegistrar.sol:FIFSRegistrar",
             "args": [ensRegistry.address, node]
@@ -180,6 +182,11 @@ task(
             args: contractConfig.args });
 
           deployedContracts[key] = contract.address;
+
+          if (contractConfig.ownSubdomain) {
+            console.log(`Transfering ownership of ${key}.${manifest.name} to ${contract.address}`)
+            await hre.run('setSubnodeOwner', { name: `${key}.${manifest.name}`, owner: contract.address })
+          }
         };
 
         await deployContractKeys.reduce(
@@ -189,15 +196,9 @@ task(
 
         // Set ownership of the namespace to the registrar
         if (manifest.namespace && manifest.namespace.type && manifest.namespace.type === "FIFSRegistrar") {
-          const ensRegistry = await hre.run("getEnsRegistry")
-          const node = namehash.hash(manifest.name)
           const registrarName = `registrar.${manifest.name}`
-          // const registrar = await hre.run('getAddress', { name: `registrar.${manifest.name}` });
-
-          // if(registrar) {
-            console.log(`Setting '${registrarName}' as the owner of .${manifest.name} namespace`)
-            await hre.run('setSubnodeOwner', { name: manifest.name, owner: registrarName });
-          // }
+          console.log(`Setting '${registrarName}' as the owner of .${manifest.name} namespace`)
+          await hre.run('setSubnodeOwner', { name: manifest.name, owner: registrarName });
         }
       });
     }
@@ -354,7 +355,9 @@ task(
   "Resolves a name on the network's ENS instance",
   async function (taskArguments, hre, runSuper) {
     const provider = await hre.run("getEnsProvider")
-    return provider.resolveName(taskArguments.name)
+    const address = await provider.resolveName(taskArguments.name)
+    console.log(`Resolved ${taskArguments.name} to ${address}`)
+    return address
   }
 ).addParam("name", "Name to resolve")
 
@@ -562,7 +565,6 @@ task(
 
     const signer = await hre.run("getEnsSigner")
     const ensRegistry = await hre.run("getEnsRegistry").then((registry) => registry.connect(signer))
-    const gasPrice = await hre.run("getGasPrice")
     const [label, node] = labelAndNode(taskArguments.name)
     const transaction = await ensRegistry.populateTransaction.setSubnodeOwner(node, label, taskArguments.owner)
     return hre.run("executeTransaction", { transaction: transaction })
@@ -698,6 +700,16 @@ task(
 ).addParam("name", "The name of the node")
 
 task(
+  "claimSubnodeWithAddress",
+  "Claims the ENS subnode, sets the resolver to the public resolver, and sets the address",
+  async function (taskArguments, hre, runSuper) {
+    return hre.run("claimSubnodeWithPublicResolver", { name: taskArguments.name })
+      .then(() => hre.run("setAddress", { name: taskArguments.name, address: taskArguments.address }));
+  }
+).addParam("name", "The name of the node")
+.addParam("address", "The address to set")
+
+task(
   "deployContractToSubnode",
   "Deploys a contract and then claims the subnode and sets the address to the newly deployed contract",
   async function (taskArguments, hre, runSuper) {
@@ -734,5 +746,15 @@ task(
   }
 ).addParam("to", "The address or ens name to send to")
 .addParam("value", "The value in wei to send")
+
+task(
+  "getEnsNode",
+  "Gets the bytes32 representation of an ENS node for a given name and logs it to the console",
+  async function (taskArguments, hre, runSuper) {
+    const ensNode = namehash.hash(taskArguments.name);
+    console.log(`ENS Node for ${taskArguments.name}: ${ensNode}`);
+    return ensNode;
+  }
+).addParam("name", "The name to convert into a bytes32 ENS node");
 
 module.exports = config;
