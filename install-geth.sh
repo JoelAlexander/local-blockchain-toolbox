@@ -15,7 +15,7 @@ fi
 # Pull geth if needed to local directory.
 # TODO: Probably could clean up this geth install to be more respectful
 gethInstallFolder="$scriptPath/host"
-gethName="geth-alltools-linux-${variant}-1.10.19-23bee162"
+gethName="geth-alltools-linux-${variant}-1.10.26-e5eb32ac"
 gethPackage="$gethName.tar.gz"
 gethDownload="https://gethstore.blob.core.windows.net/builds/$gethPackage"
 gethPath="$gethInstallFolder/$gethName"
