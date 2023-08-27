@@ -24,6 +24,7 @@ server {
     location / {
         root /var/www;
         index index.html;
+        try_files $uri $uri/ /index.html;
     }
 }
 
@@ -34,5 +35,6 @@ server {
     location / {
         root /var/www;
         index index.html;
+        try_files $uri $uri/ /index.html;
     }
 }
