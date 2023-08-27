@@ -25,6 +25,8 @@ server {
         root /var/www;
         index index.html;
         try_files $uri $uri/ /index.html;
+        add_header 'Cache-Control' 'no-store, no-cache, must-revalidate, proxy-revalidate, max-age=0';
+        expires 0;
     }
 }
 
@@ -36,5 +38,7 @@ server {
         root /var/www;
         index index.html;
         try_files $uri $uri/ /index.html;
+        add_header 'Cache-Control' 'no-store, no-cache, must-revalidate, proxy-revalidate, max-age=0';
+        expires 0;
     }
 }
