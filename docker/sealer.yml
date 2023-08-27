@@ -15,9 +15,10 @@ services:
       "--nat", "extip:172.172.172.3",
       "--ipcdisable",
       "--syncmode", "full",
-      "--gcmode", "full",
+      "--gcmode", "archive",
       "--txpool.lifetime", "12s",
-      "--txpool.pricebump", "5"
+      "--txpool.pricebump", "1",
+      "--ignore-legacy-receipts"
     ]
     volumes:
       - ${CHAIN_DIR}/sealer/.ethereum/:/.ethereum/

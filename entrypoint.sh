@@ -1,6 +1,6 @@
 #!/bin/bash
 if [[ ! -d /.ethereum/geth ]]; then
-  geth init genesis.json --datadir .ethereum
+  geth --datadir .ethereum init genesis.json
 else
   echo "/.ethereum/geth is present, skipping init"
 fi

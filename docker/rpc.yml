@@ -21,7 +21,7 @@ services:
       "--syncmode", "full",
       "--gcmode", "archive",
       "--txpool.lifetime", "12s",
-      "--txpool.pricebump", "5",
+      "--txpool.pricebump", "1",
       "--nodekey", "bootnode.key"
     ]
     volumes:
