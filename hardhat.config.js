@@ -675,18 +675,50 @@ task(
     const signer = await hre.run("getEnsSigner")
     const ensRegistry = await hre.run("getEnsRegistry")
     const name = taskArguments.name
-    const node = namehash.hash(name)
-    const currentOwner = await ensRegistry.owner(node)
+    const subnamesToClaim = await (async () => {
+      const nodes = name.split('.').reverse()
+      const nodePath = [
+        ['', '0x0000000000000000000000000000000000000000000000000000000000000000'],
+        ...(nodes.reduce((result, element) => {
+          const currentName = result.length === 0 ? element : `${element}.${result[result.length - 1][0]}`
+          const node = namehash.hash(currentName)
+          return [[currentName, node], ...result]
+        }, []))
+      ]
+      .reverse()
 
-    if (currentOwner === signer.address) {
-      console.log(`Subnode ${name} is already owned by the current signer`)
+      return Promise.all(nodePath.map(([_, node]) => ensRegistry.owner(node).then((currentOwner) => currentOwner === signer.address)))
+        .then((ownedArray) => {
+          const firstOwnedNode = ownedArray.indexOf(true)
+          if (firstOwnedNode === -1) {
+            console.log(`Cannot claim ${name}. No parent nodes are owned by the current signer`)
+            return []
+          } else {
+            const subnodes = nodePath.slice(0, firstOwnedNode)
+            if (subnodes.length === 0) {
+              console.log(`Name ${name} already claimed. All nodes are owned by the current signer`)
+            }
+            return subnodes.map(([name, _]) => name)
+          }
+        })
+    })()
+
+    if (subnamesToClaim.length === 0) {
+      console.log(`Nothing to do, exiting.`)
       return
     }
 
-    return hre.run("setSubnodeOwner", {
-      name: name,
-      owner: signer.address
-    })
+    console.log(`Claiming names in sequence: ${JSON.stringify(subnamesToClaim)}`)
+
+    return subnamesToClaim.reduce((promise, name) => {
+      return promise.then(() => {
+        console.log(`Claiming ${name}`)
+        return hre.run("setSubnodeOwner", {
+          name: name,
+          owner: signer.address
+        })
+      })
+    }, Promise.resolve())
   }
 ).addParam("name", "The name of the node")
 
