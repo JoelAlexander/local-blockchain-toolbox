@@ -682,10 +682,11 @@ task(
         ...(nodes.reduce((result, element) => {
           const currentName = result.length === 0 ? element : `${element}.${result[result.length - 1][0]}`
           const node = namehash.hash(currentName)
-          return [[currentName, node], ...result]
+          return [...result, [currentName, node]]
         }, []))
       ]
-      .reverse()
+
+      console.log(JSON.stringify(nodePath))
 
       return Promise.all(nodePath.map(([_, node]) => ensRegistry.owner(node).then((currentOwner) => currentOwner === signer.address)))
         .then((ownedArray) => {
@@ -698,7 +699,7 @@ task(
             if (subnodes.length === 0) {
               console.log(`Name ${name} already claimed. All nodes are owned by the current signer`)
             }
-            return subnodes.map(([name, _]) => name)
+            return subnodes.map(([name, _]) => name).reverse()
           }
         })
     })()
@@ -780,7 +781,7 @@ task(
 .addParam("value", "The value in wei to send")
 
 task(
-  "getEnsNode",
+  "getNode",
   "Gets the bytes32 representation of an ENS node for a given name and logs it to the console",
   async function (taskArguments, hre, runSuper) {
     const ensNode = namehash.hash(taskArguments.name);
