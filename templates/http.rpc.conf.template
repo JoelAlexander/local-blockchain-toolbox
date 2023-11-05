@@ -10,11 +10,14 @@ server {
   location / {
     proxy_pass http://rpcnode:8545;
 
-    # Replace CORS headers for localhost
+    set $allow_origin "https://{{DOMAIN}}";
+
+    # if my custom header exists
     if ($http_origin ~* (http://localhost:3030)) {
-      proxy_hide_header Access-Control-Allow-Origin;
-      add_header 'Access-Control-Allow-Origin' "$http_origin" always;
+      set $allow_origin "$http_origin";
     }
+
+    proxy_set_header Access-Control-Allow-Origin $allow_origin;
   }
 }
 
