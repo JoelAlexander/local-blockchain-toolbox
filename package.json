@@ -4,12 +4,11 @@
   "scripts": {
     "contracts": "hardhat compile",
     "makeGenesis": "node scripts/makeGenesis.js",
-    "configureModule": "node scripts/configureModule.js",
-    "deployModule": "hardhat run --network local scripts/deployModule.js"
+    "configureModule": "node scripts/configureModule.js"
   },
   "devDependencies": {
-    "@ensdomains/ens-contracts": "^0.0.3",
-    "@local-blockchain-toolbox/contract-primitives": "^1.0.14",
+    "@local-blockchain-toolbox/contract-primitives": "^1.0.26",
+    "@local-blockchain-toolbox/ens-contracts": "^0.0.2",
     "@nomiclabs/hardhat-ethers": "^2.1.0",
     "@openzeppelin/contracts": "^4.7.2",
     "eth-ens-namehash": "^2.0.8",

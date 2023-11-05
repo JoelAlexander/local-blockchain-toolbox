@@ -5,7 +5,7 @@ const path = require('node:path')
 const namehash = require('eth-ens-namehash')
 const config = require('./hardhat.config.json')
 const ethersUtils = require('ethers-utils')
-const { types } = require("hardhat/config")
+const { types, task } = require("hardhat/config")
 
 task(
   "makeGenesis",
@@ -117,96 +117,59 @@ task(
   "deployModule",
   "Deploys the module according to the manifest",
   async function (taskArguments, hre, runSuper) {
-    const ensRegistry = await hre.run("getEnsRegistry");
-    const publicResolver = await hre.run("getPublicResolver");
     const modulePath = taskArguments.modulePath
     const manifestPath = path.join(modulePath, 'manifest.json')
     const manifest = require(manifestPath)
-    const reservedKeys = { 'registrar' : true }
 
-    const deployedContracts = {
-      'ens': ensRegistry.address,
-      'resolver': publicResolver.address
+    const deployContractPromise = async ({name, source, args}) => {
+      console.log(`Deploying contract ${source} to ${name} with args ${args}`);
+      await hre.run('deployContractToSubnode', {
+        modulePath: taskArguments.modulePath,
+        contractName: source,
+        name: name,
+        args: args })
     };
-    const deployContracts = taskArguments.deploy || [];
 
-    const makeEnsName = (name) => {
-      return `${name}.${manifest.name}`
+    if(manifest.deploy && (manifest.deploy.ens || manifest.deploy.resolver)){
+        return Promise.reject(`'ens, and resolver' are reserved keys and cannot be used in the deploy list.`);
     }
 
-    if(manifest.deploy && (manifest.deploy.registrar || manifest.deploy.ens || manifest.deploy.resolver)){
-        return Promise.reject(`'registrar, ens, and resolver' are reserved keys and cannot be used in the deploy list.`);
-    }
+    const rootName = `${manifest.name}`
+    const specifiedDeployment = (taskArguments.deploy && taskArguments.deploy.length > 0) || taskArguments.deployRoot
+    const rootDeploymentConfig = { name: rootName, source: manifest.source, args: manifest.args, ownSubdomain: true }
+    const matchingDeploymentConfigs = Object.entries(manifest.deploy)
+      .map(([key, deploymentConfig]) => [`${key}.${rootName}`, deploymentConfig])
+      .filter(([name, _]) => !specifiedDeployment || (taskArguments.deploy && taskArguments.deploy[name]))
+      .map(([name, deploymentConfig]) => { return { name: name, ...deploymentConfig } })
+    const allDeploymentConfigs = [rootDeploymentConfig, ...matchingDeploymentConfigs]
+    const deploymentConfigs = specifiedDeployment ?
+      (taskArguments.deployRoot ? allDeploymentConfigs : matchingDeploymentConfigs) :
+      (await Promise.all(allDeploymentConfigs.map(({name, ..._}) => {
+        console.log(`Getting address for ${name}`)
+        return hre.run("getAddress", { name: name })
+      })).then(([...existingAddresses]) => {
+        console.log(`${JSON.stringify(existingAddresses)}`)
+        return allDeploymentConfigs.filter((_, index) => existingAddresses[index] == null)
+      }))
 
-    if (manifest.namespace && manifest.namespace.type) {
-      if (manifest.namespace.type === "FIFSRegistrar") {
-        // Adding the FIFSRegistrar into the deploy list.
-        const ensRegistry = await hre.run('getEnsRegistry')
-        const node = namehash.hash(manifest.name)
-        manifest.deploy["registrar"] = {
-            "source": "@ensdomains/ens-contracts/artifacts/contracts/registry/FIFSRegistrar.sol:FIFSRegistrar",
-            "args": [ensRegistry.address, node]
-        };
-      } else {
-        return Promise.reject(`unsupported registrar type ${namespace.type} for namespace ${namespaceKey}`);
+    console.log(`Deploying contracts: ${JSON.stringify(deploymentConfigs.map(i => i.name))}`)
+    for (let index = 0; index < deploymentConfigs.length; index++) {
+      const config = deploymentConfigs[index]
+      console.log(`Deploying ${config.name}`)
+      await deployContractPromise(config)
+    }
+    for (let index = 0; index < deploymentConfigs.length; index++) {
+      const config = deploymentConfigs[index]
+      if (config.ownSubdomain) {
+        console.log(`Transfering ownership of ${config.name} to ${config.name}`)
+        await hre.run('setSubnodeOwner', { name: config.name, owner: config.name })
       }
     }
-
-    if (manifest.deploy) {
-      console.log(`Claiming .${manifest.name}`);
-      await hre.run('claimSubnode', { name: manifest.name }).then(async () => {
-        console.log(`Deploying module contracts`);
-        const deployContractKeys = Object.keys(manifest.deploy);
-        
-        const deployContractPromise = async (key) => {
-          const contractConfig = manifest.deploy[key];
-          const ensName = makeEnsName(key);
-
-          if (deployContracts.length > 0 && !deployContracts.includes(key)) {
-            console.log(`Skipping deployment for contract ${contractConfig.source}`);
-            return;
-          }
-
-          const existingContractAddress = await hre.run("getAddress", { name: ensName });
-          if (existingContractAddress && !deployContracts.includes(key)) {
-            console.log(`Contract ${contractConfig.source} already deployed at ${existingContractAddress}`);
-            deployedContracts[key] = existingContractAddress;
-            return;
-          }
-
-          console.log(`Deploying contract ${contractConfig.source} to ${key}`);
-          const contract = await hre.run('deployContractToSubnode', {
-            modulePath: reservedKeys[key] ? undefined : taskArguments.modulePath,
-            contractName: contractConfig.source,
-            name: `${key}.${manifest.name}`,
-            args: contractConfig.args });
-
-          deployedContracts[key] = contract.address;
-
-          if (contractConfig.ownSubdomain) {
-            console.log(`Transfering ownership of ${key}.${manifest.name} to ${contract.address}`)
-            await hre.run('setSubnodeOwner', { name: `${key}.${manifest.name}`, owner: contract.address })
-          }
-        };
-
-        await deployContractKeys.reduce(
-          (prev, nextKey) => prev.then(() => deployContractPromise(nextKey)),
-          Promise.resolve(),
-        );
-
-        // Set ownership of the namespace to the registrar
-        if (manifest.namespace && manifest.namespace.type && manifest.namespace.type === "FIFSRegistrar") {
-          const registrarName = `registrar.${manifest.name}`
-          console.log(`Setting '${registrarName}' as the owner of .${manifest.name} namespace`)
-          await hre.run('setSubnodeOwner', { name: manifest.name, owner: registrarName });
-        }
-      });
-    }
-
-    console.log(`Module ${manifest.name} deployed`);
+    console.log(`Module ${rootName} deployed`);
     return Promise.resolve();
   }
 ).addParam('modulePath', 'The absolute path to the module.')
+.addFlag('deployRoot', 'Explicitly redeploy the root contract')
 .addOptionalVariadicPositionalParam("deploy", "List of contracts to be deployed");
 
 task(
@@ -266,7 +229,7 @@ task(
 
     return hre.run(
       "getDeployedContract",
-      { contractName: "@ensdomains/ens-contracts/artifacts/contracts/registry/ENSRegistry.sol:ENSRegistry",
+      { contractName: "@local-blockchain-toolbox/ens-contracts/artifacts/contracts/registry/ENSRegistry.sol:ENSRegistry",
         address: hre.network.config.ensAddress }
     )
   }
@@ -342,9 +305,10 @@ task(
   async function (taskArguments, hre, runSuper) {
     const provider = await hre.run("getEnsProvider")
     const resolverAddress = await provider.resolveName('resolver')
+
     return resolverAddress === null ? null :
       await hre.run("getDeployedContract", {
-        contractName: "@ensdomains/ens-contracts/artifacts/contracts/resolvers/PublicResolver.sol:PublicResolver",
+        contractName: "@local-blockchain-toolbox/ens-contracts/artifacts/contracts/resolvers/PublicResolver.sol:PublicResolver",
         address: resolverAddress
       })
   }
@@ -431,21 +395,75 @@ task(
 .addOptionalParam("value", "The value to send in the contract")
 .addOptionalVariadicPositionalParam("args", "Additional contract constructor arguments")
 
+const ReverseRegistrarContractName = '@local-blockchain-toolbox/contract-primitives/artifacts/contracts/IntrinsicRegistrar.sol:IntrinsicRegistrar'
+
 task(
-  "deployEns",
-  "Deploys an Ens registry.",
+  "getReverseRegistrar",
+  "Gets the reverse registrar at addr.reverse",
   async function (taskArguments, hre, runSuper) {
+    const ensSigner = await hre.run("getEnsSigner")
+    const existingReverseRegistrar = await ensSigner.resolveName('addr.reverse')
+    if (existingReverseRegistrar) {
+      return await hre.run('getDeployedContract',
+        { contractName: ReverseRegistrarContractName,
+          address: existingReverseRegistrar })
+    } else {
+      return null
+    }
+  }
+)
 
-    const resolverNode = namehash.hash('resolver')
-    const reverseAddrNode = namehash.hash('addr.reverse')
-    const publicResolverContractName = "@ensdomains/ens-contracts/artifacts/contracts/resolvers/PublicResolver.sol:PublicResolver"
+task(
+  "deployReverseRegistrar",
+  "Deploys the custom reverse registrar: IntrinsicRegistrar",
+  async function (taskArguments, hre, runSuper) {
+    console.log(`Deploying reverse registrar`)
+    const ensRegistry = await hre.run("getEnsRegistry")
+    const publicResolver = await hre.run("getPublicResolver")
+    return await hre.run('deployContractToSubnode',
+      { name: 'addr.reverse', contractName: ReverseRegistrarContractName, args: [ ensRegistry.address ]})
+      .then((deployedReverseRegistrar) => {
+          console.log(`Setting ownership of addr.reverse to ${deployedReverseRegistrar.address}`)
+          return hre.run('setSubnodeOwner', { name: 'addr.reverse', owner: deployedReverseRegistrar.address })
+      })
+  }
+)
 
+task(
+  "deployPublicResolver",
+  "Deploys the public resolver",
+  async function (taskArguments, hre, runSuper) {
     const exec = (pt) => {
       return pt.then((t) => {
         return hre.run("executeTransaction", { transaction: t })
       })
     }
 
+    const resolverNode = namehash.hash('resolver')
+    const publicResolverContractName = "@local-blockchain-toolbox/ens-contracts/artifacts/contracts/resolvers/PublicResolver.sol:PublicResolver"
+    const ensRegistry = await hre.run("getEnsRegistry")
+    console.log(`Deploying public resolver`)
+    return hre.run("deployContract", { contractName: publicResolverContractName , args: [ ensRegistry.address ]})
+    .then((deployedResolver) => {
+      console.log(`Claiming name: resolver`)
+      return hre.run("claimSubnode", { name: 'resolver' })
+      .then(() => {
+        console.log(`Setting resolver of node 'resolver' to ${deployedResolver.address}`)
+        return exec(ensRegistry.populateTransaction.setResolver(resolverNode, deployedResolver.address)).then(() => {
+          console.log(`Setting address of resolver to ${deployedResolver.address}`)
+          return exec(deployedResolver.populateTransaction['setAddr(bytes32,address)'](resolverNode, deployedResolver.address))
+          .then(() => {
+            return deployedResolver
+          })
+        })
+    })})
+  }
+)
+
+task(
+  "deployEns",
+  "Deploys an Ens registry.",
+  async function (taskArguments, hre, runSuper) {
     const deployedEnsRegistry = await hre.run("getEnsRegistry")
       .then((existingEnsRegistry) => {
         if (existingEnsRegistry) {
@@ -454,7 +472,7 @@ task(
           console.log(`Deploying ENS Registry`)
           return hre.run(
             "deployContract",
-            { contractName: "@ensdomains/ens-contracts/artifacts/contracts/registry/ENSRegistry.sol:ENSRegistry"}
+            { contractName: "@local-blockchain-toolbox/ens-contracts/artifacts/contracts/registry/ENSRegistry.sol:ENSRegistry"}
           ).then((newlyDeployedEnsRegistry) => {
             hre.network.config.ensAddress = newlyDeployedEnsRegistry.address
             return newlyDeployedEnsRegistry
@@ -469,80 +487,27 @@ task(
         return deployedEnsRegistry.connect(ensSigner)
       })
 
-    const resolver = await hre.run("getResolver")
-      .then((existingResolver) => {
-        if (existingResolver) {
-          return hre.run('getDeployedContract', {
-            contractName: publicResolverContractName,
-            address: existingResolver.address })
-        } else {
-          console.log(`Deploying resolver`)
-          return hre.run(
-            "deployContract",
-            { contractName: publicResolverContractName , args: [ ensRegistry.address ]})
-            .then((deployedResolver) => {
-              console.log(`Claiming name: resolver`)
-              return hre.run(
-                "claimSubnode",
-                { name: 'resolver' })
-              .then(() => {
-                console.log(`Setting resolver of node 'resolver' to ${deployedResolver.address}`)
-                return exec(ensRegistry.populateTransaction.setResolver(resolverNode, deployedResolver.address))
-                .then(() => {
-                  console.log(`Setting address of resolver to ${deployedResolver.address}`)
-                  return exec(deployedResolver.populateTransaction['setAddr(bytes32,address)'](resolverNode, deployedResolver.address))
-                  .then(() => {
-                    return deployedResolver
-                  })
-                })
-              }) 
-            })
-        }
-      })
-      .then((deployedResolver) => {
-        console.log(`Using resolver: ${deployedResolver.address}`)
-        return deployedResolver.connect(ensSigner)
-      })
+    const existingResolverAddress = await hre.run("getResolver")
+    if (existingResolverAddress) {
+      console.log(`Public resolver already detected, skipping deployment`)
+    } else {
+      await hre.run("deployPublicResolver")
+    }
 
-    const reverseRegistrar = await ensSigner.resolveName('addr.reverse')
-      .then((existingReverseRegistrar) => {
-        const reverseRegistrarContractName = '@ensdomains/ens-contracts/artifacts/contracts/registry/ReverseRegistrar.sol:ReverseRegistrar'
-        if (existingReverseRegistrar) {
-          return hre.run('getDeployedContract',
-            { contractName: reverseRegistrarContractName,
-              address: existingReverseRegistrar })
-        } else {
-          console.log(`Deploying reverse registrar`)
-          return hre.run(
-            'deployContract',
-            { contractName: reverseRegistrarContractName, args: [ ensRegistry.address, resolver.address ]})
-            .then((deployedReverseRegistrar) => {
-              console.log(`Claiming name: reverse`)
-              return hre.run('claimSubnode', { name: 'reverse' })
-                .then(() => {
-                  console.log(`Claiming name: addr.reverse`)
-                  return hre.run('claimSubnode', { name: 'addr.reverse'})
-                })
-                .then(() => {
-                  console.log(`Setting resolver of node 'addr.resolver' to ${resolver.address}`)
-                  return exec(ensRegistry.populateTransaction.setResolver(reverseAddrNode, resolver.address))
-                })
-                .then(() => {
-                  console.log(`Setting address of reverse registrar`)
-                  return exec(resolver.populateTransaction['setAddr(bytes32,address)'](reverseAddrNode, deployedReverseRegistrar.address))
-                })
-                .then(() => {
-                  console.log(`Setting ownership of addr.reverse to reverse registrar`)
-                  return hre.run('setSubnodeOwner', { name: 'addr.reverse', owner: deployedReverseRegistrar.address })
-                })
-                .then(() => { return deployedReverseRegistrar })
-            })
-        }
-      })
-      .then((deployedReverseRegistrar) => {
-        console.log(`Using reverse registrar: ${deployedReverseRegistrar.address}`)
-        return deployedReverseRegistrar.connect(ensSigner)
-      })
+    var existingReverseRegistrar = await hre.run('getReverseRegistrar')
+    if (!existingReverseRegistrar) {
+      console.log(`No existing reverse registrar found`)
+      existingReverseRegistrar = await hre.run('deployReverseRegistrar')
+    } 
+    console.log(`Using reverse registrar: ${existingReverseRegistrar.address}`)
+
+    const resolvedEnsAddress = await hre.run('getAddress', { name: 'ens' })
+    if (!resolvedEnsAddress || (resolvedEnsAddress != deployedEnsRegistry.address)) {
+      console.log(`Setting 'ens' to: ${deployedEnsRegistry.address}`)
+      await hre.run('claimSubnodeWithAddress', { name: 'ens', address: deployedEnsRegistry.address })
+    } else {
+      console.log(`'ens' already points to deployed registry at: ${resolvedEnsAddress}`)
+    }
   }
 )
 
@@ -605,14 +570,13 @@ task(
     const node = namehash.hash(name);
     const publicResolver = await hre.run("getPublicResolver");
     const currentResolver = await ensRegistry.resolver(node);
-
     if (currentResolver === publicResolver.address) {
       console.log(`The public resolver for the node ${name} is already set`);
       return;
     }
 
     console.log(`Setting the public resolver for the node ${name}`);
-    return hre.run("setResolver", { name: taskArguments.name, resolver: publicResolver.address });
+    return await hre.run("setResolver", { name: taskArguments.name, resolver: publicResolver.address });
   }
 ).addParam("name", "The name of the node");
 
@@ -630,7 +594,7 @@ task(
 
 task(
   "setAddress",
-  "Sets the address for the current resolver of an ENS node",
+  "Sets the address on the current resolver of an ENS node",
   async function (taskArguments, hre, runSuper) {
     const node = namehash.hash(taskArguments.name)
     const signer = await hre.run("getEnsSigner")
@@ -641,7 +605,7 @@ task(
     }
 
     const currentResolver = await hre.ethers.getContractAt(
-      "@ensdomains/ens-contracts/artifacts/contracts/resolvers/Resolver.sol:Resolver",
+      "@local-blockchain-toolbox/ens-contracts/artifacts/contracts/resolvers/Resolver.sol:Resolver",
       currentResolverAddress,
       signer)
 
@@ -656,6 +620,53 @@ task(
   }
 ).addParam("name", "The name of the node")
 .addParam("address", "The address to set")
+
+task(
+  "setABI",
+  "Sets the abi on the current resolver of an ENS node",
+  async function (taskArguments, hre, runSuper) {
+    const node = namehash.hash(taskArguments.name)
+    const signer = await hre.run("getEnsSigner")
+    const ensRegistry = await hre.run("getEnsRegistry");
+    const currentResolverAddress = await ensRegistry.resolver(node);
+    if (currentResolverAddress === ethers.constants.AddressZero) {
+      throw new Error(`No resolver set for ENS node ${taskArguments.name}`);
+    }
+
+    const currentResolver = await hre.ethers.getContractAt(
+      "@local-blockchain-toolbox/ens-contracts/artifacts/contracts/resolvers/Resolver.sol:Resolver",
+      currentResolverAddress,
+      signer)
+
+    const bytes = ethers.utils.toUtf8Bytes(taskArguments.abi)
+    const transaction = await currentResolver.populateTransaction['setABI(bytes32,uint256,bytes)'](node, 0x1, bytes)
+    return hre.run("executeTransaction", { transaction: transaction })
+  }
+).addParam("name", "The name of the node")
+.addParam("abi", "The json ABI to set")
+
+task(
+  "getABI",
+  "Gets the ABI on the current resolver of an ENS node",
+  async function (taskArguments, hre, runSuper) {
+    const node = namehash.hash(taskArguments.name)
+    const signer = await hre.run("getEnsSigner")
+    const ensRegistry = await hre.run("getEnsRegistry");
+    const currentResolverAddress = await ensRegistry.resolver(node);
+    if (currentResolverAddress === ethers.constants.AddressZero) {
+      throw new Error(`No resolver set for ENS node ${taskArguments.name}`);
+    }
+
+    const currentResolver = await hre.ethers.getContractAt(
+      "@local-blockchain-toolbox/ens-contracts/artifacts/contracts/resolvers/Resolver.sol:Resolver",
+      currentResolverAddress,
+      signer)
+
+    const abi = await currentResolver['ABI(bytes32,uint256)'](node, 0x1)
+    console.log(JSON.stringify(abi))
+    return
+  }
+).addParam("name", "The name of the node")
 
 task(
   "getOwner",
@@ -684,9 +695,7 @@ task(
           const node = namehash.hash(currentName)
           return [...result, [currentName, node]]
         }, []))
-      ]
-
-      console.log(JSON.stringify(nodePath))
+      ].reverse()
 
       return Promise.all(nodePath.map(([_, node]) => ensRegistry.owner(node).then((currentOwner) => currentOwner === signer.address)))
         .then((ownedArray) => {
@@ -694,26 +703,28 @@ task(
           if (firstOwnedNode === -1) {
             console.log(`Cannot claim ${name}. No parent nodes are owned by the current signer`)
             return []
+          } else if (firstOwnedNode === 0) {
+            console.log(`Cannot claim ${name}. Node is already owned by the current signer`)
+            return []
           } else {
-            const subnodes = nodePath.slice(0, firstOwnedNode)
-            if (subnodes.length === 0) {
+            const subnodesToClaim = nodePath.slice(0, firstOwnedNode)
+            if (subnodesToClaim.length === 0) {
               console.log(`Name ${name} already claimed. All nodes are owned by the current signer`)
             }
-            return subnodes.map(([name, _]) => name).reverse()
+            return subnodesToClaim.map(([name, _]) => name).reverse()
           }
         })
     })()
 
     if (subnamesToClaim.length === 0) {
       console.log(`Nothing to do, exiting.`)
-      return
+      return Promise.resolve()
     }
 
     console.log(`Claiming names in sequence: ${JSON.stringify(subnamesToClaim)}`)
 
     return subnamesToClaim.reduce((promise, name) => {
       return promise.then(() => {
-        console.log(`Claiming ${name}`)
         return hre.run("setSubnodeOwner", {
           name: name,
           owner: signer.address
@@ -727,8 +738,10 @@ task(
   "claimSubnodeWithPublicResolver",
   "Claims the ENS subnode and sets the resolver to the public resolver",
   async function (taskArguments, hre, runSuper) {
-    return hre.run("claimSubnode", { name: taskArguments.name })
-      .then(() => hre.run("setPublicResolver", { name: taskArguments.name }));
+    return await hre.run("claimSubnode", { name: taskArguments.name })
+      .then(() => {
+        console.log(`Setting public resolver`)
+        return hre.run("setPublicResolver", { name: taskArguments.name })});
   }
 ).addParam("name", "The name of the node")
 
@@ -736,7 +749,7 @@ task(
   "claimSubnodeWithAddress",
   "Claims the ENS subnode, sets the resolver to the public resolver, and sets the address",
   async function (taskArguments, hre, runSuper) {
-    return hre.run("claimSubnodeWithPublicResolver", { name: taskArguments.name })
+    return await hre.run("claimSubnodeWithPublicResolver", { name: taskArguments.name })
       .then(() => hre.run("setAddress", { name: taskArguments.name, address: taskArguments.address }));
   }
 ).addParam("name", "The name of the node")
@@ -744,7 +757,7 @@ task(
 
 task(
   "deployContractToSubnode",
-  "Deploys a contract and then claims the subnode and sets the address to the newly deployed contract",
+  "Deploys a contract and then claims the subnode and sets the address and the ABI",
   async function (taskArguments, hre, runSuper) {
     const name = taskArguments.name;
     console.log(`Claiming ${name}`);
@@ -756,6 +769,8 @@ task(
     });
     console.log(`Setting address of ${name} to ${contract.address}`)
     await hre.run("setAddress", { name: name, address: contract.address });
+    console.log(`Setting ABI of ${name}`)
+    await hre.run("setABI", { name: name, abi: contract.interface.format(ethers.utils.FormatTypes.json) })
     return contract
   }
 )
@@ -789,5 +804,15 @@ task(
     return ensNode;
   }
 ).addParam("name", "The name to convert into a bytes32 ENS node");
+
+task(
+  "getLabel",
+  "Gets the bytes32 representation of a label and logs it to the console",
+  async function (taskArguments, hre, runSuper) {
+    const label = hre.ethers.utils.solidityKeccak256(["string"], [taskArguments.label])
+    console.log(`ENS Node for ${taskArguments.label}: ${label}`)
+    return label
+  }
+).addPositionalParam("label", "The name to get the ens label bytes32 of")
 
 module.exports = config;
