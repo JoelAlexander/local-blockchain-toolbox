@@ -17,6 +17,7 @@ server {
       set $allow_origin "$http_origin";
     }
 
+    proxy_hide_header Access-Control-Allow-Origin;
     proxy_set_header Access-Control-Allow-Origin $allow_origin;
   }
 }
