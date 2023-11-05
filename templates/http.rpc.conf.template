@@ -9,6 +9,12 @@ server {
 
   location / {
     proxy_pass http://rpcnode:8545;
+
+    # Replace CORS headers for localhost
+    if ($http_origin ~* (http://localhost:3030)) {
+      proxy_hide_header Access-Control-Allow-Origin;
+      add_header 'Access-Control-Allow-Origin' "$http_origin" always;
+    }
   }
 }
 
