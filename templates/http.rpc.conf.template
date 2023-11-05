@@ -9,14 +9,6 @@ server {
 
   location / {
     proxy_pass http://rpcnode:8545;
-
-    # CORS headers
-    if ($http_origin ~* (https://{{DOMAIN}})) {
-        add_header 'Access-Control-Allow-Origin' "$http_origin";
-        add_header 'Access-Control-Allow-Methods' 'GET, POST, OPTIONS';
-        add_header 'Access-Control-Allow-Headers' 'Authorization,Content-Type';
-        add_header 'Access-Control-Allow-Credentials' 'true';
-    }
   }
 }
 

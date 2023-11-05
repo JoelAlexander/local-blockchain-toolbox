@@ -14,7 +14,7 @@ services:
       "--http.api", "eth,net,rpc,web3,txpool",
       "--http.addr", "0.0.0.0",
       "--http.vhosts", "*",
-      "--http.corsdomain", "*",
+      "--http.corsdomain", "https://${DOMAIN}",
       "--bootnodes", "enode://${BOOTNODE_ENODE}@172.172.172.2:30303",
       "--netrestrict", "172.172.172.0/28,192.168.86.0/24",
       "--nat", "extip:172.172.172.2",
