@@ -13,8 +13,8 @@ server {
     set $allow_origin "https://{{DOMAIN}}";
 
     # if my custom header exists
-    if ($http_origin ~* (http://localhost:3030)) {
-      set $allow_origin "$http_origin";
+    if ($http_origin ~* "http://localhost:3030") {
+      set $allow_origin $http_origin;
     }
 
     proxy_hide_header Access-Control-Allow-Origin;
