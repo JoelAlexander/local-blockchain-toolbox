@@ -40,8 +40,8 @@ server {
   gzip_types text/plain text/css text/xml text/javascript application/x-javascript application/xml text/html;
   gzip_disable "MSIE [1-6]\.";
 
-  location ~ ^/node-app(/?)(.*)$ {
-    proxy_pass http://node-app:3000/$2;  # Forward the request without the /node-app part
+  location /node-app {
+    proxy_pass http://node-app:3000;
     set $allow_origin "https://{{DOMAIN}}";
 
     # if my custom header exists
