@@ -7,7 +7,7 @@ services:
     node-app:
       container_name: node-app
       build: ./node-app
-      ports:
-        - "3000:3000"
+      expose:
+        - 3000
       networks:
         - default
