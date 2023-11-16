@@ -4,3 +4,9 @@ services:
     nginx:
         volumes:
             - ${APPLICATION_PATH}/dist:/var/www:ro
+    node-app:
+      build: ./node-app
+      ports:
+        - "3000:3000"
+      networks:
+        - default
