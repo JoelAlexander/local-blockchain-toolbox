@@ -51,7 +51,7 @@ server {
 
     proxy_hide_header Access-Control-Allow-Origin;
     add_header Access-Control-Allow-Origin $allow_origin always;
-    add_header Access-Control-Allow-Methods GET POST always;
+    add_header Access-Control-Allow-Methods "GET POST" always;
     add_header Access-Control-Allow-Headers Content-Type always;
   }
 
