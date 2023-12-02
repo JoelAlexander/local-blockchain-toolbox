@@ -13,8 +13,7 @@ task(
   async function (taskArguments, hre, runSuper) {
     const chainId = parseInt(taskArguments.chainId)
     const sealerAddress = taskArguments.sealerAddress.replace("0x", "")
-
-    const creatorWallet = ethers.Wallet.createRandom()
+    const allocAddress = taskArguments.allocAddress ? taskArguments.allocAddress : taskArguments.sealerAddress;
     const extraData = `0x0000000000000000000000000000000000000000000000000000000000000000${sealerAddress}0000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000`
     const genesis = {
       "config": {
@@ -41,27 +40,16 @@ task(
       "alloc": {}
     }
 
-    genesis.alloc[creatorWallet.address] = {
+    genesis.alloc[allocAddress] = {
       // One million and one ETH
       "balance": "1000001000000000000000000"
     }
-
-    const config = {
-      creator: {
-        address: creatorWallet.address,
-        privateKey: creatorWallet.privateKey
-      }
-    }
-
-    console.log(JSON.stringify({
-      genesis: genesis,
-      config: config
-    }, null, 2))
-
+    console.log(JSON.stringify(genesis, null, 0))
     return Promise.resolve()
   }
 ).addParam("chainId", "The chainId of the blockchain")
-.addParam("sealerAddress", "The public key of the intial sealer account")
+.addParam("sealerAddress", "The address of the intial sealer account")
+.addOptionalParam("allocAddress", "The address to allocate the coin to")
 
 task(
   "createFundedAccount",
@@ -183,7 +171,7 @@ task(
 
 task(
   "getBalance",
-  "Checks the balance of the creator account",
+  "Checks the balance of the current account",
   async function (taskArguments, hre, runSuper) {
     const provider = await hre.run("getEnsProvider")
     const signer = await hre.run("getEnsSigner")
@@ -823,5 +811,26 @@ task(
     console.log(`${signer.address}`)
   }
 )
+
+task(
+  "getEnsName",
+  "Gets the ENS name of an address",
+  async function (taskArguments, hre, runSuper) {
+    const provider = await hre.run("getEnsProvider")
+    try {
+      const name = await provider.lookupAddress(taskArguments.address);
+      if (!name) {
+        console.log(`The address ${taskArguments.address} does not have an associated ENS name.`);
+      } else {
+        console.log(`The ENS name for address ${taskArguments.address} is ${name}.`);
+      }
+      return name
+    } catch (error) {
+      console.log(`An error occurred while attempting to get the ENS name: ${error.message}`);
+    }
+    return null
+  }
+)
+.addParam("address", "The address to check")
 
 module.exports = config;
