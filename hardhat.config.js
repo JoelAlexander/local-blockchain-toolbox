@@ -815,4 +815,13 @@ task(
   }
 ).addPositionalParam("label", "The name to get the ens label bytes32 of")
 
+task(
+  "getSignerAddress",
+  "Gets the public address of the current signer and logs it to the console",
+  async function (taskArguments, hre, runSuper) {
+    const signer = await hre.run("getEnsSigner")
+    console.log(`${signer.address}`)
+  }
+)
+
 module.exports = config;

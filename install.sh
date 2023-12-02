@@ -1,8 +1,5 @@
 #!/bin/bash
-
 scriptPath=$(dirname $(realpath $0))
-
-# TODO: Make this script less chatty, and only touching things if it needs to.
 sudo mkdir -p /etc/apt/keyrings
 curl -fsSL https://download.docker.com/linux/ubuntu/gpg | sudo gpg --yes --dearmor -o /etc/apt/keyrings/docker.gpg
 echo \

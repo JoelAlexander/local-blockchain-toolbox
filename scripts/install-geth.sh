@@ -13,10 +13,8 @@ else
   exit
 fi
 
-# Pull geth if needed to local directory.
-# TODO: Probably could clean up this geth install to be more respectful
-gethInstallFolder="$scriptPath/host"
-gethName="geth-alltools-linux-${variant}-1.10.26-e5eb32ac"
+gethInstallFolder="$LOCAL_DATA_DIR/geth"
+gethName="geth-alltools-linux-${variant}-1.13.5-916d6a44"
 gethPackage="$gethName.tar.gz"
 gethDownload="https://gethstore.blob.core.windows.net/builds/$gethPackage"
 gethPath="$gethInstallFolder/$gethName"
