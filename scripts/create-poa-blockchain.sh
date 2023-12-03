@@ -1,72 +1,73 @@
 #!/bin/bash
 SCRIPT_DIR=$(dirname "$0")
 source "${SCRIPT_DIR}/local-env.sh"
+
 gethPath=$($SCRIPT_DIR/install-geth.sh)
 geth="$gethPath/geth"
-clef="$gethPath/clef"
 
-# Prompt for chain ID
-echo -n "Enter a name for this blockchain: "
+echo -n "Enter a name for the blockchain: "
 read chainName
 
 chainDir="$LOCAL_DATA_DIR/chains/$chainName"
 keystoreDir="$LOCAL_DATA_DIR/keystore"
-clefDir="$chainDir/clef"
 
+# Check if the chain directory already exists
 if [ -d "$chainDir" ]; then
     echo "Chain with name $chainName already exists: $chainDir" && exit 1
 fi
 
+# Create chain directory
 mkdir -p $chainDir
-mkdir -p $clefDir
 
 # Prompt for chain ID
 echo -n "Enter a chain ID for the blockchain: "
 read chainId
 
-# Function to prompt for password
-prompt_password() {
-    while true; do
-        read -s -p "Enter a new password (10 or more characters): " password
-        echo
-        read -s -p "Confirm your password: " password_confirm
-        echo
-
-        if [ "$password" != "$password_confirm" ]; then
-            echo "Passwords do not match. Please try again."
-        elif [ ${#password} -lt 10 ]; then
-            echo "Password is less than 10 characters. Please try again."
-        else
-            break
-        fi
-    done
+# Function to get account address from keystore file
+get_account_address() {
+    local keystoreFile=$1
+    local addressInFilename=${keystoreFile##*--}
+    echo $addressInFilename
 }
 
-echo "Please write down your password before continuing."
-prompt_password
+# Helper function to select account
+select_account() {
+    local accountType=$1
+    local partialAddress=${2:-}
 
-# Create new account and store in the specified keystore directory
-echo "Creating new account..."
-passwordInput="$password\n$password"
-newAccountOutput=$(printf "$passwordInput" | $geth account new --keystore $keystoreDir)
+    echo "Selecting $accountType account..."
+    KEYS=
 
-# Extract and store account details
-sealerAccount=$(echo $newAccountOutput | grep -Po 'Public address of the key: \K0x[a-fA-F0-9]+')
-sealerKeystorePath=$(echo $newAccountOutput | grep -Po 'Path of the secret key file: \K[^ ]+')
+    select KEYSTORE_FILE in $KEYS; do
+        if [ -n "$KEYSTORE_FILE" ]; then
+            
+            echo "Selected $accountType account: $selectedAddress"
+            break
+        else
+            echo "Please select a valid keystore file."
+        fi
+    done
 
-echo $newAccountOutput
-echo $keystoreDir
-echo $sealerAccount
-echo $sealerKeystorePath
-# Initialize Clef for this chain with chain ID
-echo "Initializing Clef for chain: $chainName with chain ID: $chainId"
-$clef --keystore $keystoreDir --configdir $clefDir --chainid $chainId --suppress-bootwarn init
+    echo $selectedAddress
+}
 
+# Select sealer account
+echo "Selecting sealer account..."
+keystoreFile=$($SCRIPT_DIR/get-keystore.sh $1)
+sealerAddress=$(get_account_address "$keystoreFile")
+echo "Sealer address: $sealerAddress"
+
+# Select alloc account
+echo "Selecting alloc account..."
+keystoreFile=$($SCRIPT_DIR/get-keystore.sh $1)
+allocAddress=$(get_account_address "$keystoreFile")
+echo "Alloc address: $allocAddress"
+
+# Create the genesis block
+echo "Creating genesis block..."
 genesis=$(npx hardhat makeGenesis\
   --chain-id $chainId\
-  --sealer-address $sealerAccount\
-  --alloc-address $sealerAccount)
+  --sealer-address $sealerAddress\
+  --alloc-address $allocAddress)
 
 echo $genesis > $chainDir/genesis.json
-
-#$SCRIPT_DIR/create-bootnode.sh $chainName
