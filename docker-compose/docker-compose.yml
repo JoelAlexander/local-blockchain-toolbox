@@ -1,0 +1,46 @@
+version: "3.8"
+
+services:
+  nginx:
+    container_name: nginx
+    image: local-blockchain-toolbox/nginx
+    volumes:
+      - ./nginx.conf:/etc/nginx/nginx.conf:ro
+      #- ./nginx-entrypoint.sh
+      # - ${APPLICATION_PATH:-index.html}:/var/www:ro
+    environment:
+      - NGINX_HTTP_CONF
+      - NGINX_STREAM_CONF
+    entrypoint: ./entrypoint.sh
+    networks:
+      default:
+      geth-net:
+        ipv4_address: 172.172.172.4
+    restart: unless-stopped
+
+  # headscale:
+  #   container_name: headscale
+  #   image: headscale/headscale:latest
+  #   command: ["headscale", "serve"]
+  #   volumes:
+  #     - ${HEADSCALE_PATH}:/etc/headscale
+      # expose:
+      #   - 8080
+      #   - 9090
+  #   networks:
+  #     - default
+  #   restart: unless-stopped
+
+  # node-app:
+  #   container_name: node-app
+  #   build: ./node-app
+  #   networks:
+  #     - default
+  #   restart: unless-stopped
+
+networks:
+  geth-net:
+    ipam:
+      config:
+        - subnet: "172.172.172.0/28"
+          ip_range: "172.172.172.0/28"

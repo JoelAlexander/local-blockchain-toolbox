@@ -2,10 +2,7 @@
 SCRIPT_DIR=$(dirname "$0")
 source "${SCRIPT_DIR}/local-env.sh"
 
-gethPath=$($SCRIPT_DIR/install-geth.sh)
-geth="$gethPath/geth"
-
-echo -n "Enter a name for the blockchain: "
+echo -n "Enter a name for the blockchain: " >&2
 read chainName
 
 chainDir="$LOCAL_DATA_DIR/chains/$chainName"
@@ -13,14 +10,15 @@ keystoreDir="$LOCAL_DATA_DIR/keystore"
 
 # Check if the chain directory already exists
 if [ -d "$chainDir" ]; then
-    echo "Chain with name $chainName already exists: $chainDir" && exit 1
+    echo "Chain with name $chainName already exists: $chainDir" >&2
+    exit 1
 fi
 
 # Create chain directory
 mkdir -p $chainDir
 
 # Prompt for chain ID
-echo -n "Enter a chain ID for the blockchain: "
+echo -n "Enter a chain ID for the blockchain: " >&2
 read chainId
 
 # Function to get account address from keystore file
@@ -30,44 +28,41 @@ get_account_address() {
     echo $addressInFilename
 }
 
-# Helper function to select account
-select_account() {
-    local accountType=$1
-    local partialAddress=${2:-}
+# Function to repeatedly prompt for keystore file until a valid selection is made
+prompt_for_keystore() {
+    local keystoreFile
+    local success=false
 
-    echo "Selecting $accountType account..."
-    KEYS=
-
-    select KEYSTORE_FILE in $KEYS; do
-        if [ -n "$KEYSTORE_FILE" ]; then
-            
-            echo "Selected $accountType account: $selectedAddress"
-            break
+    while [ "$success" = false ]; do
+        keystoreFile=$($SCRIPT_DIR/get-keystore.sh)
+        if [ $? -eq 0 ]; then
+            success=true
+            echo $keystoreFile
         else
-            echo "Please select a valid keystore file."
+            echo "Invalid selection. Please try again." >&2
         fi
     done
-
-    echo $selectedAddress
 }
 
 # Select sealer account
-echo "Selecting sealer account..."
-keystoreFile=$($SCRIPT_DIR/get-keystore.sh $1)
+echo "Selecting sealer account..." >&2
+keystoreFile=$(prompt_for_keystore)
 sealerAddress=$(get_account_address "$keystoreFile")
-echo "Sealer address: $sealerAddress"
+echo "Sealer address: $sealerAddress" >&2
 
 # Select alloc account
-echo "Selecting alloc account..."
-keystoreFile=$($SCRIPT_DIR/get-keystore.sh $1)
+echo "Selecting alloc account..." >&2
+keystoreFile=$(prompt_for_keystore)
 allocAddress=$(get_account_address "$keystoreFile")
-echo "Alloc address: $allocAddress"
+echo "Alloc address: $allocAddress" >&2
 
 # Create the genesis block
-echo "Creating genesis block..."
-genesis=$(npx hardhat makeGenesis\
-  --chain-id $chainId\
-  --sealer-address $sealerAddress\
+echo "Creating genesis block..." >&2
+genesis=$(npx hardhat makeGenesis \
+  --chain-id $chainId \
+  --sealer-address $sealerAddress \
   --alloc-address $allocAddress)
 
 echo $genesis > $chainDir/genesis.json
+
+echo $chainDir

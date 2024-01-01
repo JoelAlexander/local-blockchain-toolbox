@@ -2,11 +2,13 @@ version: "3.8"
 
 services:
   nginx:
-    depends_on:
-      - rpcnode
+    ports:
+      - "30808:30808/udp"
+      - "30808:30808/tcp"
+
   rpcnode:
     container_name: rpcnode
-    image: gethnode:latest
+    image: local-blockchain-toolbox/geth
     command: [
       "--networkid", "${CHAIN_ID}",
       "--datadir", "/.ethereum",
@@ -14,7 +16,7 @@ services:
       "--http.api", "eth,net,rpc,web3,txpool",
       "--http.addr", "0.0.0.0",
       "--http.vhosts", "*",
-      "--http.corsdomain", "https://${DOMAIN}",
+      "--http.corsdomain", "https://${RPC_DOMAIN}",
       "--bootnodes", "enode://${BOOTNODE_ENODE}@172.172.172.2:30303",
       "--netrestrict", "172.172.172.0/28,192.168.86.0/24",
       "--nat", "extip:172.172.172.2",
@@ -25,9 +27,9 @@ services:
       "--nodekey", "bootnode.key"
     ]
     volumes:
-      - ${CHAIN_DIR}/rpc/.ethereum/:/.ethereum/
-      - ${CHAIN_DIR}/genesis.json:/genesis.json
-      - ${CHAIN_DIR}/bootnode.key:/bootnode.key
+      - ${RPC_ETHEREUM_DIR}:/.ethereum/
+      - ${GENESIS_FILE_PATH}:/genesis.json
+      - ${BOOTNODE_KEY}:/bootnode.key
     expose:
       - 8545
       - "30303/tcp"

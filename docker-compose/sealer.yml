@@ -1,0 +1,46 @@
+version: "3.8"
+
+services:
+  clef:
+    container_name: clef
+    image: local-blockchain-toolbox/clef
+    entrypoint: ./entrypoint.sh
+    environment:
+      - CHAIN_ID
+      - CLEF_PASSWORD
+    volumes:
+      - ${CLEF_DIR}:/.clef/
+      - ${SEALER_KEYSTORE}:/.ethereum/keystore/${SEALER_ADDRESS}
+      - ${CLEF_RULES}:/rules.js
+    ipc: "shareable"
+    restart: unless-stopped
+
+  sealingnode:
+    container_name: sealingnode
+    image: local-blockchain-toolbox/geth
+    depends_on:
+      - clef
+    command: [
+      "--miner.etherbase", "${SEALER_ADDRESS}",
+      "--signer", "/.clef/clef.ipc",
+      "--mine",
+      "--networkid", "${CHAIN_ID}",
+      "--datadir", "/.ethereum",
+      "--bootnodes", "enode://${BOOTNODE_ENODE}@172.172.172.2:30303",
+      "--netrestrict", "172.172.172.0/28",
+      "--nat", "extip:172.172.172.3",
+      "--ipcdisable",
+      "--syncmode", "full",
+      "--gcmode", "archive",
+      "--txpool.lifetime", "12s",
+      "--txpool.pricebump", "1"
+    ]
+    volumes:
+      - ${SEALER_ETHEREUM_DIR}:/.ethereum/
+      - ${GENESIS_FILE_PATH}:/genesis.json
+      - ${CLEF_IPC}:/.clef/clef.ipc
+    ipc: "service:clef"
+    networks:
+      geth-net:
+        ipv4_address: 172.172.172.3
+    restart: unless-stopped

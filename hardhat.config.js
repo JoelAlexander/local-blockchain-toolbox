@@ -6,6 +6,100 @@ const namehash = require('eth-ens-namehash')
 const config = require('./hardhat.config.json')
 const ethersUtils = require('ethers-utils')
 const { types, task } = require("hardhat/config")
+const readlineSync = require('readline-sync')
+
+extendEnvironment((hre) => {
+  const activeProfilePath = path.join(__dirname, '.local', 'active_profile');
+  var activeProfileName = null;
+  try {
+    activeProfileName = fs.readFileSync(activeProfilePath, 'utf8').trim();
+  } catch (error) {}
+
+  if (!activeProfileName || activeProfileName == '') {
+    console.warn("No active profile set. Must configure a profile before running most hardhat tasks")
+    return
+  }
+  
+  const profilePath = path.join(__dirname, '.local', 'profiles', activeProfileName, 'profile.json');
+  const profile = JSON.parse(fs.readFileSync(profilePath, 'utf8'));
+
+  if (profile.accounts && profile.accounts.length > 0) {
+      const firstAccount = profile.accounts[0];
+      hre.firstAccount = firstAccount;
+
+      // Identifying the keystore file
+      const keystoreDir = path.join(__dirname, '.local', 'keystore');
+      const keystoreFile = fs.readdirSync(keystoreDir).find(file => file.includes(firstAccount.slice(2)));
+      const keystorePath = path.join(keystoreDir, keystoreFile);
+      if (keystorePath) {
+          console.log(`Found keystore file for the first account: ${keystorePath}`);
+
+          // Prompting for password using readline-sync
+          const password = readlineSync.question('Enter password for the keystore: ', {
+              hideEchoBack: true // The typed text on screen is hidden by `*` (default).
+          });
+
+          try {
+              const keystore = fs.readFileSync(keystorePath, 'utf8');
+              const wallet = hre.ethers.Wallet.fromEncryptedJsonSync(keystore, password);
+              console.log('Account unlocked successfully');
+              hre.activeLocalSigner = wallet;
+          } catch (error) {
+              console.error('Failed to unlock account:', error.message);
+          }
+      } else {
+          console.error('Keystore file not found for the first account.');
+      }
+  } else {
+      console.error('No accounts found in the active profile.');
+  }
+
+  var rpcUrl = null;
+  var ensAddress = null;
+  if (profile.rpc && profile.rpc.domain) {
+      const rpcDomain = profile.rpc.domain;
+      const protocol = rpcDomain === 'localhost' ? 'http' : 'https';
+      const port = rpcDomain === 'localhost' ? ':80' : '';
+      rpcUrl = `${protocol}://${rpcDomain}${port}/`;
+      ensAddress = profile.rpc.ens;
+      console.log(`RPC URL: ${rpcUrl}`);
+  } else {
+      console.error('RPC domain is not defined in the active profile.');
+  }
+
+  // Read the chain ID from the chains directory
+  var chainId = null;
+  if (profile.chain) {
+    const chainDir = path.join(__dirname, '.local', 'chains', profile.chain);
+    const genesisPath = path.join(chainDir, 'genesis.json');
+    if (fs.existsSync(genesisPath)) {
+        const genesis = JSON.parse(fs.readFileSync(genesisPath, 'utf8'));
+        chainId = genesis.config ? genesis.config.chainId : null;
+        if (chainId) {
+            console.log(`Chain ID: ${chainId}`);
+        } else {
+            console.error('Chain ID not found in genesis file.');
+        }
+    } else {
+        console.error(`Genesis file not found for chain: ${profile.chain}`);
+    }
+  }
+
+  if (profile.chain && chainId && rpcUrl) {
+    const providerConfig = {
+      name: profile.chain,
+      chainId: chainId
+    }
+    if (ensAddress) {
+      providerConfig.ensAddress = ensAddress
+    }
+    hre.activeLocalProvider = new hre.ethers.providers.JsonRpcProvider({
+      url: rpcUrl
+    }, providerConfig)
+  } else {
+    console.warn("Chain not setup, no local provider set.  Many hardhat tasks will not function correctly.")
+  }
+});
 
 task(
   "makeGenesis",
@@ -227,22 +321,7 @@ task(
   "getEnsProvider",
   "Gets an ENS enabled provider for the active chain",
   async function (taskArguments, hre, runSuper) {
-
-    return hre.run(
-      "getEnsRegistry"
-    ).then((ensRegistry) => {
-      const providerConfig = {
-        name: hre.network.name,
-        chainId: hre.network.config.chainId
-      }
-      if (ensRegistry) {
-        providerConfig.ensAddress = ensRegistry.address
-      }
-      const provider = new hre.ethers.providers.JsonRpcProvider({
-        url: hre.network.config.url
-      }, providerConfig)
-      return provider
-    })
+    return Promise.resolve(hre.activeLocalProvider);
   }
 )
 
@@ -250,16 +329,10 @@ task(
   "getEnsSigner",
   "Gets an ENS enabled signer for the active chain",
   async function (taskArguments, hre, runSuper) {
-
-    if (!hre.network.config.accounts || hre.network.config.accounts.length < 1) {
-      console.log(`No account found for chain ${hre.network.name}`)
-      return Promise.resolve()
-    }
-
     return hre.run(
       "getEnsProvider"
     ).then((ensProvider) => {
-      return new hre.ethers.Wallet(hre.network.config.accounts[0], ensProvider)
+      return hre.activeLocalSigner.connect(ensProvider)
     })
   }
 )

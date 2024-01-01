@@ -19,6 +19,8 @@ get_username() {
 # Create HOSTNAME_LOCAL with .local suffix
 HOSTNAME_LOCAL="${HOSTNAME}.local"
 
+echo "${LOCAL_DATA_DIR}/nodes/${HOSTNAME}.json"
+
 # Get the username from the node file
 USERNAME=$(get_username "$HOSTNAME")
 if [ -z "$USERNAME" ]; then

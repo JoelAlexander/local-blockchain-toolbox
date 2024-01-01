@@ -1,30 +1,32 @@
 #!/bin/bash
-
-# Source the local environment script to set environment variables
 SCRIPT_DIR=$(dirname "$0")
 source "${SCRIPT_DIR}/local-env.sh"
 
-# Ensure Geth is installed using install-geth.sh
-GETH_PATH=$(${SCRIPT_DIR}/install-geth.sh)
+CLEF="$GETH_DIR/clef"
 
-# Define the path to the clef tool
-CLEF="$GETH_PATH/clef"
+prompt_for_password() {
+    while true; do
+        read -s -p "Enter password: " password1 >&2
+        echo >&2
+        read -s -p "Verify password: " password2 >&2
+        echo >&2
 
-# Check if clef exists
-if [ ! -f "$CLEF" ]; then
-    echo "clef tool not found at $CLEF"
-    exit 1
+        if [ "$password1" == "$password2" ] && [ ${#password1} -ge 10 ]; then
+            break
+        else
+            echo "Passwords do not match or are shorter than 10 characters. Please try again." >&2
+        fi
+    done
+
+    echo "$password1"
+}
+
+if [ $# -eq 1 ]; then
+    PASSWORD=$1
+else
+    PASSWORD=$(prompt_for_password)
 fi
 
-# Check for required arguments
-if [ $# -lt 1 ]; then
-    echo "Usage: $0 <password>"
-    exit 1
-fi
-
-PASSWORD=$1
-
-# Run clef to create a new account and extract the account address
 NEW_ACCOUNT_OUTPUT=$(echo $PASSWORD | $CLEF newaccount --keystore "$LOCAL_DATA_DIR/keystore" --suppress-bootwarn)
 NEW_ACCOUNT_ADDRESS=$(echo "$NEW_ACCOUNT_OUTPUT" | grep -o 'Generated account \S*' | awk '{print $3}')
 

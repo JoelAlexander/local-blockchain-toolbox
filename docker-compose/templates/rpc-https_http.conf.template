@@ -1,0 +1,25 @@
+server {
+  listen 443 http2 ssl;
+  listen [::]:443 http2 ssl;
+
+  server_name {{DOMAIN}};
+
+  ssl_certificate /etc/ssl/certs/{{DOMAIN}}/fullchain.pem;
+  ssl_certificate_key /etc/ssl/certs/{{DOMAIN}}/privkey.pem;
+
+  location / {
+    proxy_pass http://rpcnode:8545;
+
+    set $allow_origin "https://{{ORIGIN_DOMAIN}}";
+
+    # if my custom header exists
+    if ($http_origin ~* "http://localhost:3030") {
+      set $allow_origin $http_origin;
+    }
+
+    proxy_hide_header Access-Control-Allow-Origin;
+    add_header Access-Control-Allow-Origin $allow_origin always;
+    add_header Access-Control-Allow-Methods 'POST, OPTIONS' always;
+    add_header Access-Control-Allow-Headers Content-Type always;
+  }
+}

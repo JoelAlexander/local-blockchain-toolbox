@@ -1,7 +1,0 @@
-version: "3.8"
-
-services:
-  nginx:
-    volumes:
-      - ${CERT_FULLCHAIN}:/etc/ssl/certs/${DOMAIN}/fullchain.pem:ro
-      - ${CERT_PRIVKEY}:/etc/ssl/certs/${DOMAIN}/privkey.pem:ro

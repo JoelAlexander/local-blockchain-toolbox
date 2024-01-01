@@ -2,42 +2,72 @@
 SCRIPT_DIR=$(dirname "$0")
 source "${SCRIPT_DIR}/local-env.sh"
 
-# Check for required arguments
-if [ $# -lt 1 ]; then
-    echo "Usage: $0 <chain_name> [account_address]"
-    exit 1
-fi
+CLEF="$GETH_DIR/clef"
 
-CHAIN_NAME=$1
-ACCOUNT_ADDRESS=${2:-}
+get_account_address() {
+    local keystoreFile=$1
+    local addressInFilename=${keystoreFile##*--}
+    echo $addressInFilename
+}
 
-CHAIN_DIR="$LOCAL_DATA_DIR/chains/$CHAIN_NAME"
-GENESIS_FILE="$CHAIN_DIR/genesis.json"
+prompt_for_keystore() {
+    local keystoreFile
+    local success=false
 
-if [ ! -d "$CHAIN_DIR" ] || [ ! -f "$GENESIS_FILE" ]; then
-    echo "Error: Chain '$CHAIN_NAME' does not exist or missing genesis.json file."
-    exit 1
-fi
+    while [ "$success" = false ]; do
+        keystoreFile=$($SCRIPT_DIR/get-keystore.sh)
+        if [ $? -eq 0 ]; then
+            success=true
+            echo $keystoreFile
+        else
+            echo "Invalid selection. Please try again." >&2
+        fi
+    done
+}
 
-if [ -n "$ACCOUNT_ADDRESS" ]; then
-    # Get the keystore file for the provided address
-    KEYSTORE_FILE=$(${SCRIPT_DIR}/get-keystore.sh $ACCOUNT_ADDRESS)
+prompt_for_password() {
+    while true; do
+        read -s -p "Enter password: " password1 >&2
+        echo >&2
 
-    if [ -n "$KEYSTORE_FILE" ]; then
-        echo "Found keystore file: $KEYSTORE_FILE"
-        echo "Please enter the password for the existing account."
-        prompt_password
-        # Logic to attach the account to Clef for the specified chain
-    fi
+        if [ ${#password1} -ge 10 ]; then
+            break
+        else
+            echo "Password is shorter than 10 characters. Please try again." >&2
+        fi
+    done
+
+    echo "$password1"
+}
+
+update_profile_with_account() {
+    local account_address=$1
+    local profile_file="$ACTIVE_PROFILE_DIRECTORY/profile.json"
+
+    # Add the account address to the accounts array in the profile JSON
+    jq --arg account "$account_address" '.accounts += [$account]' "$profile_file" > temp.json && mv temp.json "$profile_file"
+}
+
+# If arguments are provided, use them. Otherwise, prompt for input.
+if [ $# -eq 3 ]; then
+    ACCOUNT_ADDRESS="$1"
+    KEYSTORE_PASSWORD="$2"
+    MASTER_PASSWORD="$3"
 else
-    echo "No account address provided. Creating a new account..."
-    echo "Please write down your password before continuing."
-    prompt_password
-    ${SCRIPT_DIR}/create-account.sh $password
-    # Logic to attach the newly created account to Clef for the specified chain
+    echo "Select account to attach to profile $ACTIVE_PROFILE" >&2
+    ACCOUNT_KEYSTORE=$($SCRIPT_DIR/get-keystore.sh)
+    ACCOUNT_ADDRESS=$(get_account_address "$ACCOUNT_KEYSTORE")
+    
+    echo "Confirm password for account keystore: $ACCOUNT_ADDRESS" >&2
+    KEYSTORE_PASSWORD=$(prompt_for_password)
+
+    echo "Confirm master password for profile: $ACTIVE_PROFILE" >&2
+    MASTER_PASSWORD=$(prompt_for_password)
 fi
 
-# Initialize Clef for this chain with chain ID
-#echo "Initializing Clef for chain: $chainName with chain ID: $chainId"
-#$clef --keystore $keystoreDir --configdir $CLEF_DIR --chainid $chainId --suppress-bootwarn init
-
+$CLEF --keystore "$LOCAL_DATA_DIR/keystore" --configdir "$PROFILE_CLEF_DIR" --chainid "$PROFILE_CHAIN_ID" --suppress-bootwarn setpw $ACCOUNT_ADDRESS <<EOF
+$KEYSTORE_PASSWORD
+$KEYSTORE_PASSWORD
+$MASTER_PASSWORD
+EOF
+update_profile_with_account "$ACCOUNT_ADDRESS"

@@ -1,56 +1,52 @@
 #!/bin/bash
-
 SCRIPT_DIR=$(dirname "$0")
 source "${SCRIPT_DIR}/local-env.sh"
 
-echo "Blockchain Node Manager Status Report"
-echo "====================================="
+echo -e "Blockchain Node Manager Status Report\n====================================="
 
-echo "Available Profiles:"
-if [ -d "$LOCAL_DATA_DIR/profiles" ]; then
-    ls "$LOCAL_DATA_DIR/profiles"
+# Display the chain name
+echo -e "\nChain Name: $PROFILE_CHAIN_NAME"
+
+# Check if genesis file exists and parse required information
+if [ -f "$PROFILE_CHAIN_GENESIS_FILE" ]; then
+    echo -e "\nGenesis File for chain $PROFILE_CHAIN_NAME:"
+    echo "Chain ID: $PROFILE_CHAIN_ID"
+    
+    echo "Alloc Addresses and Balances:"
+    jq -r '.alloc | to_entries[] | "\(.key): balance \(.value.balance)"' "$PROFILE_CHAIN_GENESIS_FILE"
+
+    echo "Original Sealing Node Address: $PROFILE_CHAIN_SEALER_ADDRESS"
 else
-    echo "No profiles connected."
+    echo "Genesis file for chain $PROFILE_CHAIN_NAME not found."
 fi
-echo
 
-# List Connected Chains
-echo "Connected Chains:"
-if [ -d "$LOCAL_DATA_DIR/chains" ]; then
-    ls "$LOCAL_DATA_DIR/chains"
+# Check RPC domain status
+echo -e "\nRPC Domain: $PROFILE_CHAIN_RPC_DOMAIN"
+if ping -c 1 "$PROFILE_CHAIN_RPC_DOMAIN" &> /dev/null; then
+    echo "RPC is online."
 else
-    echo "No chains connected."
+    echo "RPC is offline."
 fi
-echo
 
-# List Accounts
-echo "Accounts:"
-if [ -d "$LOCAL_DATA_DIR/keystore" ]; then
-    ls "$LOCAL_DATA_DIR/keystore"
+# Display linked accounts
+echo -e "\nLinked Accounts:"
+if [ ${#PROFILE_LINKED_ACCOUNTS[@]} -eq 0 ]; then
+    echo "No linked accounts."
 else
-    echo "No accounts found."
+    for account in "${PROFILE_LINKED_ACCOUNTS[@]}"; do
+        echo -n "$account"
+        [ "$account" == "$PROFILE_ACTIVE_ACCOUNT" ] && echo " (active)" || echo
+        keypath=$($SCRIPT_DIR/get-keystore.sh $account)
+        if [ -f "$keypath" ]; then
+            echo "Keystore found: $keypath"
+            balance=$(npx hardhat getBalance --account $account)
+            echo "Balance: $balance"
+        else
+            echo "Keystore not found for account $account"
+        fi
+    done
 fi
-echo
 
-# List Nodes
-echo "Nodes:"
-if [ -d "$LOCAL_DATA_DIR/nodes" ]; then
-    ls "$LOCAL_DATA_DIR/nodes"
-else
-    echo "No nodes configured."
-fi
-echo
+echo -e "\nBoonode Enode: $DEFAULT_BOOTNODE_ENODE"
 
-# List SSH Keys
-echo "SSH Keys:"
-if [ -d "$LOCAL_DATA_DIR/.ssh" ]; then
-    ls "$LOCAL_DATA_DIR/.ssh"
-else
-    echo "No SSH keys available."
-fi
-echo
-
-# Other relevant details
-# This can include additional checks or summaries based on your specific setup and requirements.
-
-echo "Status report completed."
+echo -e "\nStatus report completed."

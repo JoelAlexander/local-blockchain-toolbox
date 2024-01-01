@@ -1,0 +1,10 @@
+version: "3.8"
+
+services:
+  nginx:
+    ports:
+      - 80:80
+      - 443:443
+    volumes:
+      - ${RPC_FULLCHAIN}:/etc/ssl/certs/${RPC_DOMAIN}/fullchain.pem:ro
+      - ${RPC_PRIVKEY}:/etc/ssl/certs/${RPC_DOMAIN}/privkey.pem:ro
