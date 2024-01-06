@@ -102,50 +102,6 @@ extendEnvironment((hre) => {
 });
 
 task(
-  "makeGenesis",
-  "Makes the genesis file for the local blockchain",
-  async function (taskArguments, hre, runSuper) {
-    const chainId = parseInt(taskArguments.chainId)
-    const sealerAddress = taskArguments.sealerAddress.replace("0x", "")
-    const allocAddress = taskArguments.allocAddress ? taskArguments.allocAddress : taskArguments.sealerAddress;
-    const extraData = `0x0000000000000000000000000000000000000000000000000000000000000000${sealerAddress}0000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000`
-    const genesis = {
-      "config": {
-        "chainId": chainId,
-        "homesteadBlock": 0,
-        "eip150Block": 0,
-        "eip150Hash": "0x0000000000000000000000000000000000000000000000000000000000000000",
-        "eip155Block": 0,
-        "eip158Block": 0,
-        "byzantiumBlock": 0,
-        "constantinopleBlock": 0,
-        "petersburgBlock": 0,
-        "istanbulBlock": 0,
-        "berlinBlock": 0,
-        "londonBlock": 0,
-        "clique": {
-          "period": 6
-        }
-      },
-      "difficulty": "1",
-      "gasLimit": "8000000",
-      "extraData": extraData,
-      "nonce": "0x0",
-      "alloc": {}
-    }
-
-    genesis.alloc[allocAddress] = {
-      // One million and one ETH
-      "balance": "1000001000000000000000000"
-    }
-    console.log(JSON.stringify(genesis, null, 0))
-    return Promise.resolve()
-  }
-).addParam("chainId", "The chainId of the blockchain")
-.addParam("sealerAddress", "The address of the intial sealer account")
-.addOptionalParam("allocAddress", "The address to allocate the coin to")
-
-task(
   "createFundedAccount",
   "Creates and funds a account",
   async function (taskArguments, hre, runSuper) {

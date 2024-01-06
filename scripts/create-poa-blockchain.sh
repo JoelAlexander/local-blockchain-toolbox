@@ -56,13 +56,10 @@ keystoreFile=$(prompt_for_keystore)
 allocAddress=$(get_account_address "$keystoreFile")
 echo "Alloc address: $allocAddress" >&2
 
+# Define the path for the genesis file
+genesisFilePath="$chainDir/genesis.json"
+
 # Create the genesis block
 echo "Creating genesis block..." >&2
-genesis=$(npx hardhat makeGenesis \
-  --chain-id $chainId \
-  --sealer-address $sealerAddress \
-  --alloc-address $allocAddress)
-
-echo $genesis > $chainDir/genesis.json
-
+node makeGenesis.js $chainId $sealerAddress $allocAddress $genesisFilePath >&2
 echo $chainDir
