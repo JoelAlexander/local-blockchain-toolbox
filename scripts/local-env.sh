@@ -1,6 +1,47 @@
 #!/bin/bash
 SCRIPT_DIR=$(dirname "$0")
-# Function to get the root directory of the Git repository
+
+is_package_installed() {
+    dpkg -l "$1" &> /dev/null
+}
+
+ARCHITECTURE=$(dpkg --print-architecture)
+
+sudo apt-get update
+
+if ! is_package_installed docker-ce; then
+    sudo apt-get install -y apt-transport-https ca-certificates curl software-properties-common
+    curl -fsSL https://download.docker.com/linux/ubuntu/gpg | sudo apt-key add -
+    
+    # Add Docker repository based on architecture
+    if [ "$ARCHITECTURE" = "amd64" ] || [ "$ARCHITECTURE" = "x86_64" ]; then
+        REPO_ARCH="amd64"
+    elif [ "$ARCHITECTURE" = "arm64" ]; then
+        REPO_ARCH="arm64"
+    else
+        echo "Unsupported architecture: $ARCHITECTURE"
+        exit 1
+    fi
+    
+    sudo add-apt-repository "deb [arch=$REPO_ARCH] https://download.docker.com/linux/ubuntu $(lsb_release -cs) stable"
+    sudo apt-get update
+    sudo apt-get install -y docker-ce
+fi
+
+sudo usermod -aG docker $USER || true
+
+PACKAGES=(
+    "headscale"
+)
+
+for package in "${PACKAGES[@]}"; do
+    if ! is_package_installed "$package"; then
+        sudo apt-get install -y "$package"
+    fi
+done
+
+echo "Environment pre-check complete."
+
 get_git_root_dir() {
     git rev-parse --show-toplevel 2>/dev/null
 }
@@ -44,7 +85,6 @@ prompt_for_active_profile() {
         break
     done
 }
-
 
 if [ -f "$ACTIVE_PROFILE_FILE_PATH" ]; then
     ACTIVE_PROFILE=$(cat "$ACTIVE_PROFILE_FILE_PATH")
@@ -151,6 +191,26 @@ if [ -f "$PROFILE_CHAIN_GENESIS_FILE" ]; then
     extraData=$(jq -r '.extraData' "$PROFILE_CHAIN_GENESIS_FILE")
     export PROFILE_CHAIN_ID=$(jq -r '.config.chainId // empty' "$PROFILE_CHAIN_GENESIS_FILE")
     export PROFILE_CHAIN_SEALER_ADDRESS="0x${extraData:66:40}"  # Extract 40 characters after the first 66 characters
+fi
+
+ENS_NAME=$(jq -r '.ens // empty' "$ACTIVE_PROFILE_FILE")
+if [ -z "$ENS_NAME" ]; then
+    ENS_NAME="default"
+fi
+export ENS_NAME
+
+ENS_JSON_FILE="$LOCAL_DATA_DIR/chains/$PROFILE_CHAIN_NAME/ens.json"
+
+# Check if ENS JSON file exists and read the address associated with the ENS name
+if [ -f "$ENS_JSON_FILE" ]; then
+    ENS_ADDRESS=$(jq -r --arg ensName "$ENS_NAME" '.[$ensName] // empty' "$ENS_JSON_FILE")
+    if [ -n "$ENS_ADDRESS" ]; then
+        export ENS_ADDRESS
+    else
+        echo "Warning: No address found for ENS name '$ENS_NAME' in $ENS_JSON_FILE."
+    fi
+else
+    echo "Warning: ENS configuration file ($ENS_JSON_FILE) not found."
 fi
 
 export BOOTNODES_DIR="$LOCAL_DATA_DIR/bootnodes"
