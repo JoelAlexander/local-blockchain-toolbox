@@ -1,12 +1,10 @@
-require("@nomiclabs/hardhat-ethers")
+require("@nomicfoundation/hardhat-ethers")
 const ethJsUtil = require('ethereumjs-util')
 const fs = require('fs')
 const path = require('node:path')
 const namehash = require('eth-ens-namehash')
 const config = require('./hardhat.config.json')
-const ethersUtils = require('ethers-utils')
 const { types, task } = require("hardhat/config")
-const readlineSync = require('readline-sync')
 
 extendEnvironment((hre) => {
   const activeProfilePath = path.join(__dirname, '.local', 'active_profile');
@@ -22,49 +20,25 @@ extendEnvironment((hre) => {
   
   const profilePath = path.join(__dirname, '.local', 'profiles', activeProfileName, 'profile.json');
   const profile = JSON.parse(fs.readFileSync(profilePath, 'utf8'));
+  hre.cc = { chainName: profile.chain };
 
   if (profile.accounts && profile.accounts.length > 0) {
-      const firstAccount = profile.accounts[0];
-      hre.firstAccount = firstAccount;
+    hre.cc.address = "0x" + profile.accounts[0];
 
-      // Identifying the keystore file
-      const keystoreDir = path.join(__dirname, '.local', 'keystore');
-      const keystoreFile = fs.readdirSync(keystoreDir).find(file => file.includes(firstAccount.slice(2)));
-      const keystorePath = path.join(keystoreDir, keystoreFile);
-      if (keystorePath) {
-          console.log(`Found keystore file for the first account: ${keystorePath}`);
-
-          // Prompting for password using readline-sync
-          const password = readlineSync.question('Enter password for the keystore: ', {
-              hideEchoBack: true // The typed text on screen is hidden by `*` (default).
-          });
-
-          try {
-              const keystore = fs.readFileSync(keystorePath, 'utf8');
-              const wallet = hre.ethers.Wallet.fromEncryptedJsonSync(keystore, password);
-              console.log('Account unlocked successfully');
-              hre.activeLocalSigner = wallet;
-          } catch (error) {
-              console.error('Failed to unlock account:', error.message);
-          }
-      } else {
-          console.error('Keystore file not found for the first account.');
+    const keystoreDir = path.join(__dirname, '.local', 'keystore');
+    const keystoreFile = fs.readdirSync(keystoreDir).find(file => file.includes(hre.cc.address.slice(2)));
+    const keystorePath = path.join(keystoreDir, keystoreFile);
+    if (keystorePath && process.env.ACCOUNT_PASSWORD) {
+      console.log(`Opening keystore for the active account: ${keystorePath}`);
+      try {
+          const keystore = fs.readFileSync(keystorePath, 'utf8');
+          const wallet = hre.ethers.Wallet.fromEncryptedJsonSync(keystore, process.env.ACCOUNT_PASSWORD);
+          console.log('Account unlocked successfully');
+          hre.activeLocalSigner = wallet;
+      } catch (error) {
+          console.error('Failed to unlock account:', error.message);
       }
-  } else {
-      console.error('No accounts found in the active profile.');
-  }
-
-  var rpcUrl = null;
-  var ensAddress = null;
-  if (profile.rpc && profile.rpc.domain) {
-      const rpcDomain = profile.rpc.domain;
-      const protocol = rpcDomain === 'localhost' ? 'http' : 'https';
-      const port = rpcDomain === 'localhost' ? ':80' : '';
-      rpcUrl = `${protocol}://${rpcDomain}${port}/`;
-      ensAddress = profile.rpc.ens;
-      console.log(`RPC URL: ${rpcUrl}`);
-  } else {
-      console.error('RPC domain is not defined in the active profile.');
+    }
   }
 
   // Read the chain ID from the chains directory
@@ -74,30 +48,23 @@ extendEnvironment((hre) => {
     const genesisPath = path.join(chainDir, 'genesis.json');
     if (fs.existsSync(genesisPath)) {
         const genesis = JSON.parse(fs.readFileSync(genesisPath, 'utf8'));
-        chainId = genesis.config ? genesis.config.chainId : null;
-        if (chainId) {
-            console.log(`Chain ID: ${chainId}`);
-        } else {
-            console.error('Chain ID not found in genesis file.');
-        }
-    } else {
-        console.error(`Genesis file not found for chain: ${profile.chain}`);
+        hre.cc.chainId = genesis.config.chainId;
     }
+  } else {
+    console.error(`Genesis file not found for chain: ${profile.chain}`);
   }
 
-  if (profile.chain && chainId && rpcUrl) {
-    const providerConfig = {
-      name: profile.chain,
-      chainId: chainId
-    }
-    if (ensAddress) {
-      providerConfig.ensAddress = ensAddress
-    }
-    hre.activeLocalProvider = new hre.ethers.providers.JsonRpcProvider({
-      url: rpcUrl
-    }, providerConfig)
+  if (profile.rpc && profile.rpc.domain) {
+      const rpcDomain = profile.rpc.domain;
+      const protocol = rpcDomain === 'localhost' ? 'http' : 'https';
+      const port = rpcDomain === 'localhost' ? ':80' : '';
+      hre.cc.rpcUrl = `${protocol}://${rpcDomain}${port}/`;
+      hre.cc.ens = profile.ens;
+      console.log(`Chain ID: ${hre.cc.chainId}`);
+      console.log(`RPC: ${hre.cc.rpcUrl}`);
+      console.log(`ENS: ${hre.cc.ens}`);
   } else {
-    console.warn("Chain not setup, no local provider set.  Many hardhat tasks will not function correctly.")
+      console.error('RPC domain is not defined in the active profile.');
   }
 });
 
@@ -105,7 +72,7 @@ task(
   "createFundedAccount",
   "Creates and funds a account",
   async function (taskArguments, hre, runSuper) {
-    const wallet = ethers.Wallet.createRandom()
+    const wallet = hre.ethers.Wallet.createRandom()
     console.log(`Funding new account ${wallet.address} with 1 ETH: ${wallet.privateKey}`)
     return hre.run('sendEth', { to: wallet.address, value: "1000000000000000000" })
   }
@@ -120,9 +87,9 @@ task(
     const manifest = require(manifestPath)
 
     const configuration = {
-      chainId: hre.network.config.chainId,
-      url: hre.network.config.url,
-      ens: hre.network.config.ensAddress
+      chainId: hre.cc.chainId,
+      url: hre.cc.rpcUrl,
+      ens: hre.cc.ens
     }
 
     const handleConfigurationEntry = (key) => {
@@ -215,7 +182,9 @@ task(
   "Gets the current gas price",
   async function (taskArguments, hre, runSuper) {
     const provider = await hre.run("getEnsProvider")
-    return provider.getGasPrice()
+    return provider.getFeeData().then((feeData) => {
+      return feeData.gasPrice
+    });
   }
 )
 
@@ -224,8 +193,7 @@ task(
   "Checks the balance of the current account",
   async function (taskArguments, hre, runSuper) {
     const provider = await hre.run("getEnsProvider")
-    const signer = await hre.run("getEnsSigner")
-    const address = taskArguments.address ? taskArguments.address : signer.address
+    const address = taskArguments.address ? taskArguments.address : hre.cc.address
     return provider.getBalance(address).then((balance) => {
       console.log(`${address}: ${balance}`)
     })
@@ -238,8 +206,9 @@ task(
   async function (taskArguments, hre, runSuper) {
     const gasPrice = await hre.run("getGasPrice")
       .then((gasPrice) => {
+
         // Overpay 40%
-        return gasPrice.add(gasPrice.div(40))
+        return gasPrice + (gasPrice / BigInt(40))
       })
     const signer = await hre.run("getEnsSigner")
     const unsignedTransaction = taskArguments.transaction
@@ -261,14 +230,14 @@ task(
   "getEnsRegistry",
   "Gets the ENS registry for the active chain",
   async function (taskArguments, hre, runSuper) {
-    if (!hre.network.config.ensAddress) {
+    if (!hre.cc.ens) {
       return Promise.resolve(null)
     }
 
     return hre.run(
       "getDeployedContract",
       { contractName: "@local-blockchain-toolbox/ens-contracts/artifacts/contracts/registry/ENSRegistry.sol:ENSRegistry",
-        address: hre.network.config.ensAddress }
+        address: hre.cc.ens }
     )
   }
 )
@@ -277,7 +246,15 @@ task(
   "getEnsProvider",
   "Gets an ENS enabled provider for the active chain",
   async function (taskArguments, hre, runSuper) {
-    return Promise.resolve(hre.activeLocalProvider);
+    const networkish = {
+      name: hre.cc.chainName,
+      chainId: hre.cc.chainId
+    }
+    if (hre.cc.ens) {
+      networkish.ensAddress = hre.cc.ens
+    }
+    return Promise.resolve(
+      new hre.ethers.JsonRpcProvider(hre.cc.rpcUrl, networkish));
   }
 )
 
@@ -297,7 +274,9 @@ task(
   "getContractFactory",
   "Gets a contract factory",
   async function (taskArguments, hre, runSuper) {
-    return hre.ethers.getContractFactory(taskArguments.contractName)
+    const provider = await hre.run("getEnsProvider")
+    const contractFactory = await hre.ethers.getContractFactory(taskArguments.contractName, provider)
+    return contractFactory.connect(provider)
   }
 )
 .addParam("contractName", "The name or fully qualified name of the contract")
@@ -315,6 +294,15 @@ task(
 )
 .addParam("contractName", "The name or fully qualified name of the contract")
 .addParam("address", "The address of the deployed contract")
+
+task(
+  "getCode",
+  "Gets the deployed code for an address",
+  async function (taskArguments, hre, runSuper) {
+    const provider = await hre.run("getEnsProvider")
+    return provider.getCode(taskArguments.address).then(console.log)
+  }
+).addParam("address", "The address of the contract")
 
 task(
   "getPublicResolver",
@@ -361,16 +349,19 @@ task(
   "deployContract",
   "Deploys a contract from a module",
   async function (taskArguments, hre, runSuper) {
+    const signer = await hre.run("getEnsSigner")
     const args = taskArguments.args ? taskArguments.args : []
-    const contractFactory = taskArguments.modulePath ? 
+    var contractFactory = (taskArguments.modulePath ? 
       await hre.run("getModuleContractFactory", { modulePath: taskArguments.modulePath, contractName: taskArguments.contractName }) :
-      await hre.run("getContractFactory", { contractName: taskArguments.contractName })
+      await hre.run("getContractFactory", { contractName: taskArguments.contractName })).connect(signer)
     const gasPrice = await hre.run("getGasPrice")
     const contract = await contractFactory.deploy(...args, { gasPrice: gasPrice })
-    console.log(`${taskArguments.contractName} deploying to: ${contract.address}`)
-    return contract.deployTransaction.wait().then(() => {
+    //console.log(`${JSON.stringify(contract)}`)
+    console.log(`${taskArguments.contractName} deploying to: ${contract.target}`)
+    return contract.waitForDeployment().then((deployedContract) => {
       console.log(`${taskArguments.contractName} deployment confirmed`)
-      return contract
+      //console.log(`${JSON.stringify(deployedContract)}`)
+      return deployedContract
     })
   }
 ).addParam("contractName", "The contract name within the module")
@@ -402,7 +393,7 @@ task(
     }
     const contract = await hre.run("getDeployedModuleContract", { modulePath: taskArguments.modulePath, contractName: taskArguments.contractName, address: taskArguments.address })
     console.log(`Executing method: ${taskArguments.method} on ${taskArguments.contractName} at ${taskArguments.address} with a value of ${taskArguments.value}`)
-    const transaction = await contract.populateTransaction[taskArguments.method](...args, overrides)
+    const transaction = await contract[taskArguments.method].populateTransaction(...args, overrides)
     return hre.run("executeTransaction", { transaction: transaction }).then(console.log)
   }
 ).addParam("modulePath", "The path to the module")
@@ -438,10 +429,10 @@ task(
     const ensRegistry = await hre.run("getEnsRegistry")
     const publicResolver = await hre.run("getPublicResolver")
     return await hre.run('deployContractToSubnode',
-      { name: 'addr.reverse', contractName: ReverseRegistrarContractName, args: [ ensRegistry.address ]})
+      { name: 'addr.reverse', contractName: ReverseRegistrarContractName, args: [ ensRegistry.target ]})
       .then((deployedReverseRegistrar) => {
-          console.log(`Setting ownership of addr.reverse to ${deployedReverseRegistrar.address}`)
-          return hre.run('setSubnodeOwner', { name: 'addr.reverse', owner: deployedReverseRegistrar.address })
+          console.log(`Setting ownership of addr.reverse to ${deployedReverseRegistrar.target}`)
+          return hre.run('setSubnodeOwner', { name: 'addr.reverse', owner: deployedReverseRegistrar.target })
       })
   }
 )
@@ -460,15 +451,15 @@ task(
     const publicResolverContractName = "@local-blockchain-toolbox/ens-contracts/artifacts/contracts/resolvers/PublicResolver.sol:PublicResolver"
     const ensRegistry = await hre.run("getEnsRegistry")
     console.log(`Deploying public resolver`)
-    return hre.run("deployContract", { contractName: publicResolverContractName , args: [ ensRegistry.address ]})
+    return hre.run("deployContract", { contractName: publicResolverContractName , args: [ ensRegistry.target ]})
     .then((deployedResolver) => {
       console.log(`Claiming name: resolver`)
       return hre.run("claimSubnode", { name: 'resolver' })
       .then(() => {
-        console.log(`Setting resolver of node 'resolver' to ${deployedResolver.address}`)
-        return exec(ensRegistry.populateTransaction.setResolver(resolverNode, deployedResolver.address)).then(() => {
-          console.log(`Setting address of resolver to ${deployedResolver.address}`)
-          return exec(deployedResolver.populateTransaction['setAddr(bytes32,address)'](resolverNode, deployedResolver.address))
+        console.log(`Setting resolver of node 'resolver' to ${deployedResolver.target}`)
+        return exec(ensRegistry.setResolver.populateTransaction(resolverNode, deployedResolver.target)).then(() => {
+          console.log(`Setting address of resolver to ${deployedResolver.target}`)
+          return exec(deployedResolver['setAddr(bytes32,address)'].populateTransaction(resolverNode, deployedResolver.target))
           .then(() => {
             return deployedResolver
           })
@@ -491,19 +482,13 @@ task(
             "deployContract",
             { contractName: "@local-blockchain-toolbox/ens-contracts/artifacts/contracts/registry/ENSRegistry.sol:ENSRegistry"}
           ).then((newlyDeployedEnsRegistry) => {
-            hre.network.config.ensAddress = newlyDeployedEnsRegistry.address
+            hre.cc.ens = newlyDeployedEnsRegistry.target;
             return newlyDeployedEnsRegistry
           })
         }
       })
-      
-    const ensSigner = await hre.run("getEnsSigner")
-    const ensRegistry = await Promise.resolve(deployedEnsRegistry)
-      .then((deployedEnsRegistry) => {
-        console.log(`Using ENSRegistry: ${deployedEnsRegistry.address}`)
-        return deployedEnsRegistry.connect(ensSigner)
-      })
-
+    
+    console.log(`Using ENSRegistry: ${deployedEnsRegistry.target}`)
     const existingResolverAddress = await hre.run("getResolver")
     if (existingResolverAddress) {
       console.log(`Public resolver already detected, skipping deployment`)
@@ -511,19 +496,23 @@ task(
       await hre.run("deployPublicResolver")
     }
 
+    const ensSigner = await hre.run("getEnsSigner")
+    const ensRegistry = await Promise.resolve(deployedEnsRegistry.connect(ensSigner))
     var existingReverseRegistrar = await hre.run('getReverseRegistrar')
     if (!existingReverseRegistrar) {
       console.log(`No existing reverse registrar found`)
       existingReverseRegistrar = await hre.run('deployReverseRegistrar')
     } 
-    console.log(`Using reverse registrar: ${existingReverseRegistrar.address}`)
+    console.log(`Using reverse registrar: ${existingReverseRegistrar.target}`)
 
     const resolvedEnsAddress = await hre.run('getAddress', { name: 'ens' })
-    if (!resolvedEnsAddress || (resolvedEnsAddress != deployedEnsRegistry.address)) {
-      console.log(`Setting 'ens' to: ${deployedEnsRegistry.address}`)
-      await hre.run('claimSubnodeWithAddress', { name: 'ens', address: deployedEnsRegistry.address })
+    if (!resolvedEnsAddress || (resolvedEnsAddress != deployedEnsRegistry.target)) {
+      console.log(`Setting 'ens' to: ${deployedEnsRegistry.target}`)
+      await hre.run('claimSubnodeWithAddress', { name: 'ens', address: deployedEnsRegistry.target })
+      console.log(`${deployedEnsRegistry.target}`)
     } else {
       console.log(`'ens' already points to deployed registry at: ${resolvedEnsAddress}`)
+      console.log(`${resolvedEnsAddress}`)
     }
   }
 )
@@ -539,7 +528,7 @@ task(
         throw "Name must not be empty"
       }
       const leaf = names[0]
-      const label = ethersUtils.id(leaf)
+      const label = hre.ethers.solidityPackedKeccak256(["string"], [leaf])
       const nodeString = names.slice(1, names.length).join('.')
       const node = namehash.hash(nodeString)
       return [label, node]
@@ -548,7 +537,7 @@ task(
     const signer = await hre.run("getEnsSigner")
     const ensRegistry = await hre.run("getEnsRegistry").then((registry) => registry.connect(signer))
     const [label, node] = labelAndNode(taskArguments.name)
-    const transaction = await ensRegistry.populateTransaction.setSubnodeOwner(node, label, taskArguments.owner)
+    const transaction = await ensRegistry.setSubnodeOwner.populateTransaction(node, label, taskArguments.owner)
     return hre.run("executeTransaction", { transaction: transaction })
   }
 ).addParam("name", "The name of the node")
@@ -560,7 +549,11 @@ task(
   async function (taskArguments, hre, runSuper) {
     const name = taskArguments.name ? taskArguments.name : 'resolver'
     const provider = await hre.run("getEnsProvider")
-    return provider.getResolver(name)
+    var resolved = null;
+    try {
+      resolved = await provider.getResolver(name)
+    } catch (e) {}
+    return resolved
   }
 ).addOptionalParam("name", "The name of the node to get the resolver of.  Defaults to public resolver: 'resolver'")
 
@@ -572,7 +565,7 @@ task(
     const ensRegistry = await hre.run("getEnsRegistry").then((registry) => registry.connect(signer))
     const gasPrice = await hre.run("getGasPrice")
     const node = namehash.hash(taskArguments.name)
-    const transaction = await ensRegistry.populateTransaction.setResolver(node, taskArguments.resolver, { gasPrice: gasPrice })
+    const transaction = await ensRegistry.setResolver.populateTransaction(node, taskArguments.resolver, { gasPrice: gasPrice })
     return hre.run('executeTransaction', { transaction: transaction })
   }
 ).addParam("name", "The name of the node")
@@ -587,13 +580,13 @@ task(
     const node = namehash.hash(name);
     const publicResolver = await hre.run("getPublicResolver");
     const currentResolver = await ensRegistry.resolver(node);
-    if (currentResolver === publicResolver.address) {
+    if (currentResolver === publicResolver.target) {
       console.log(`The public resolver for the node ${name} is already set`);
       return;
     }
 
     console.log(`Setting the public resolver for the node ${name}`);
-    return await hre.run("setResolver", { name: taskArguments.name, resolver: publicResolver.address });
+    return await hre.run("setResolver", { name: taskArguments.name, resolver: publicResolver.target });
   }
 ).addParam("name", "The name of the node");
 
@@ -603,7 +596,7 @@ task(
   async function (taskArguments, hre, runSuper) {
     const node = namehash.hash(taskArguments.name)
     const resolver = await hre.run("getPublicResolver")
-    const transaction = await resolver.populateTransaction['setAddr(bytes32,address)'](node, taskArguments.address)
+    const transaction = await resolver['setAddr(bytes32,address)'].populateTransaction(node, taskArguments.address)
     return hre.run("executeTransaction", { transaction: transaction })
   }
 ).addParam("name", "The name of the node")
@@ -617,7 +610,7 @@ task(
     const signer = await hre.run("getEnsSigner")
     const ensRegistry = await hre.run("getEnsRegistry");
     const currentResolverAddress = await ensRegistry.resolver(node);
-    if (currentResolverAddress === ethers.constants.AddressZero) {
+    if (currentResolverAddress === hre.ethers.ZeroAddress) {
       throw new Error(`No resolver set for ENS node ${taskArguments.name}`);
     }
 
@@ -632,7 +625,7 @@ task(
       return;
     }
 
-    const transaction = await currentResolver.populateTransaction['setAddr(bytes32,address)'](node, taskArguments.address)
+    const transaction = await currentResolver['setAddr(bytes32,address)'].populateTransaction(node, taskArguments.address)
     return hre.run("executeTransaction", { transaction: transaction })
   }
 ).addParam("name", "The name of the node")
@@ -646,7 +639,7 @@ task(
     const signer = await hre.run("getEnsSigner")
     const ensRegistry = await hre.run("getEnsRegistry");
     const currentResolverAddress = await ensRegistry.resolver(node);
-    if (currentResolverAddress === ethers.constants.AddressZero) {
+    if (currentResolverAddress === hre.ethers.ZeroAddress) {
       throw new Error(`No resolver set for ENS node ${taskArguments.name}`);
     }
 
@@ -655,8 +648,8 @@ task(
       currentResolverAddress,
       signer)
 
-    const bytes = ethers.utils.toUtf8Bytes(taskArguments.abi)
-    const transaction = await currentResolver.populateTransaction['setABI(bytes32,uint256,bytes)'](node, 0x1, bytes)
+    const bytes = hre.ethers.toUtf8Bytes(taskArguments.abi)
+    const transaction = await currentResolver['setABI(bytes32,uint256,bytes)'].populateTransaction(node, 0x1, bytes)
     return hre.run("executeTransaction", { transaction: transaction })
   }
 ).addParam("name", "The name of the node")
@@ -670,7 +663,7 @@ task(
     const signer = await hre.run("getEnsSigner")
     const ensRegistry = await hre.run("getEnsRegistry");
     const currentResolverAddress = await ensRegistry.resolver(node);
-    if (currentResolverAddress === ethers.constants.AddressZero) {
+    if (currentResolverAddress === hre.ethers.ZeroAddress) {
       throw new Error(`No resolver set for ENS node ${taskArguments.name}`);
     }
 
@@ -714,7 +707,9 @@ task(
         }, []))
       ].reverse()
 
-      return Promise.all(nodePath.map(([_, node]) => ensRegistry.owner(node).then((currentOwner) => currentOwner === signer.address)))
+      return Promise.all(nodePath.map(([nodename, node]) => ensRegistry.owner(node).then((currentOwner) => {
+          return currentOwner === signer.address
+        })))
         .then((ownedArray) => {
           const firstOwnedNode = ownedArray.indexOf(true)
           if (firstOwnedNode === -1) {
@@ -784,10 +779,10 @@ task(
       contractName: taskArguments.contractName,
       args: taskArguments.args,
     });
-    console.log(`Setting address of ${name} to ${contract.address}`)
-    await hre.run("setAddress", { name: name, address: contract.address });
+    console.log(`Setting address of ${name} to ${contract.target}`)
+    await hre.run("setAddress", { name: name, address: contract.target });
     console.log(`Setting ABI of ${name}`)
-    await hre.run("setABI", { name: name, abi: contract.interface.format(ethers.utils.FormatTypes.json) })
+    await hre.run("setABI", { name: name, abi: contract.interface.formatJson() })
     return contract
   }
 )
@@ -826,7 +821,7 @@ task(
   "getLabel",
   "Gets the bytes32 representation of a label and logs it to the console",
   async function (taskArguments, hre, runSuper) {
-    const label = hre.ethers.utils.solidityKeccak256(["string"], [taskArguments.label])
+    const label = hre.ethers.solidityPackedKeccak256(["string"], [taskArguments.label])
     console.log(`ENS Node for ${taskArguments.label}: ${label}`)
     return label
   }

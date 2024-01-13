@@ -1,47 +1,6 @@
 #!/bin/bash
 SCRIPT_DIR=$(dirname "$0")
 
-is_package_installed() {
-    dpkg -l "$1" &> /dev/null
-}
-
-ARCHITECTURE=$(dpkg --print-architecture)
-
-sudo apt-get update
-
-if ! is_package_installed docker-ce; then
-    sudo apt-get install -y apt-transport-https ca-certificates curl software-properties-common
-    curl -fsSL https://download.docker.com/linux/ubuntu/gpg | sudo apt-key add -
-    
-    # Add Docker repository based on architecture
-    if [ "$ARCHITECTURE" = "amd64" ] || [ "$ARCHITECTURE" = "x86_64" ]; then
-        REPO_ARCH="amd64"
-    elif [ "$ARCHITECTURE" = "arm64" ]; then
-        REPO_ARCH="arm64"
-    else
-        echo "Unsupported architecture: $ARCHITECTURE"
-        exit 1
-    fi
-    
-    sudo add-apt-repository "deb [arch=$REPO_ARCH] https://download.docker.com/linux/ubuntu $(lsb_release -cs) stable"
-    sudo apt-get update
-    sudo apt-get install -y docker-ce
-fi
-
-sudo usermod -aG docker $USER || true
-
-PACKAGES=(
-    "headscale"
-)
-
-for package in "${PACKAGES[@]}"; do
-    if ! is_package_installed "$package"; then
-        sudo apt-get install -y "$package"
-    fi
-done
-
-echo "Environment pre-check complete."
-
 get_git_root_dir() {
     git rev-parse --show-toplevel 2>/dev/null
 }
@@ -173,12 +132,13 @@ PROFILE_CHAIN_RPC_DOMAIN=$(jq -r '.rpc.domain // empty' "$ACTIVE_PROFILE_FILE")
 PROFILE_CHAIN_GENESIS_FILE="$LOCAL_DATA_DIR/chains/$PROFILE_CHAIN_NAME/genesis.json"
 [ -f "$PROFILE_CHAIN_GENESIS_FILE" ] && export PROFILE_CHAIN_GENESIS_FILE
 
-PROFILE_ACTIVE_ACCOUNT=$(jq -r '.activeAccount // empty' "$ACTIVE_PROFILE_FILE")
-[ -n "$PROFILE_ACTIVE_ACCOUNT" ] && export PROFILE_ACTIVE_ACCOUNT
-
 # Check if the accounts array exists and is not null
 if jq -e '.accounts // empty' "$ACTIVE_PROFILE_FILE" > /dev/null; then
     PROFILE_LINKED_ACCOUNTS=($(jq -r '.accounts[]' "$ACTIVE_PROFILE_FILE"))
+    if [ -z "$PROFILE_ACTIVE_ACCOUNT" ] && [ ${#PROFILE_LINKED_ACCOUNTS[@]} -gt 0 ]; then
+        export PROFILE_ACTIVE_ACCOUNT="${PROFILE_LINKED_ACCOUNTS[0]}"
+    fi
+
     export PROFILE_LINKED_ACCOUNTS=("${PROFILE_LINKED_ACCOUNTS[@]}")
 else
     PROFILE_LINKED_ACCOUNTS=()  # Initialize as an empty array if accounts are not available
@@ -194,10 +154,9 @@ if [ -f "$PROFILE_CHAIN_GENESIS_FILE" ]; then
 fi
 
 ENS_NAME=$(jq -r '.ens // empty' "$ACTIVE_PROFILE_FILE")
-if [ -z "$ENS_NAME" ]; then
-    ENS_NAME="default"
+if [ ! -z "$ENS_NAME" ]; then
+    export ENS_NAME
 fi
-export ENS_NAME
 
 ENS_JSON_FILE="$LOCAL_DATA_DIR/chains/$PROFILE_CHAIN_NAME/ens.json"
 
@@ -206,8 +165,6 @@ if [ -f "$ENS_JSON_FILE" ]; then
     ENS_ADDRESS=$(jq -r --arg ensName "$ENS_NAME" '.[$ensName] // empty' "$ENS_JSON_FILE")
     if [ -n "$ENS_ADDRESS" ]; then
         export ENS_ADDRESS
-    else
-        echo "Warning: No address found for ENS name '$ENS_NAME' in $ENS_JSON_FILE."
     fi
 else
     echo "Warning: ENS configuration file ($ENS_JSON_FILE) not found."

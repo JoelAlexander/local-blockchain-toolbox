@@ -2,7 +2,8 @@
 SCRIPT_DIR=$(dirname "$0")
 source "${SCRIPT_DIR}/local-env.sh"
 
-composeFiles=($(${SCRIPT_DIR}/docker-compose-files.sh))
+composeFilesRaw=$(${SCRIPT_DIR}/docker-compose-files.sh | tail -n 1)
+composeFiles=($composeFilesRaw)
 composeFileArgs=$(printf -- "-f %s " "${composeFiles[@]}")
 
 nginx_http_conf=""
@@ -79,8 +80,6 @@ if [[ " ${composeFiles[*]} " =~ " ${REPO_ROOT_DIR}/docker-compose/application.ym
     nginx_http_conf+=$'\n'
   fi
 fi
-
-echo $nginx_http_conf
 
 export NGINX_HTTP_CONF="$nginx_http_conf"
 export NGINX_STREAM_CONF="$nginx_stream_conf"
