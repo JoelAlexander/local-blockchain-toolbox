@@ -1,0 +1,9 @@
+version: "3.8"
+
+services:
+  nginx:
+    ports:
+      - {{PORT}}:{{PORT}}
+    volumes:
+      - {{CHAIN_CONFIG_PATH}}:/var/www/chain-config.json:ro
+      - {{APPLICATION_PATH}}:/var/www/{{APPLICATION_NAME}}:ro

@@ -1,6 +1,6 @@
 server {
-  listen 443 http2 ssl;
-  listen [::]:443 http2 ssl;
+  listen {{PORT}} http2 ssl;
+  listen [::]:{{PORT}} http2 ssl;
 
   server_name {{DOMAIN}};
 
@@ -29,8 +29,13 @@ server {
   #  add_header Access-Control-Allow-Headers Content-Type always;
   #}
 
+  location /chain-config.json {
+    alias /var/www/chain-config.json;
+    default_type application/json;
+  }
+
   location / {
-    root /var/www;
+    root /var/www/{{APP_NAME}};
     index index.html;
     try_files $uri $uri/ /index.html;
     expires 12h;

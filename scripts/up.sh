@@ -46,6 +46,9 @@ export BOOTNODE_KEY="$DEFAULT_BOOTNODE_KEY"
 PROFILE_APP_DOMAIN="localhost"
 APP_DOMAIN=$PROFILE_APP_DOMAIN
 if [ "localhost" != "$RPC_DOMAIN" ]; then
+  CERTIFICATE_SETUP_OUTPUT=$(bash "$SCRIPT_DIR/setup-domain.sh" "$RPC_DOMAIN")
+  export RPC_FULLCHAIN=$(echo "$CERTIFICATE_SETUP_OUTPUT" | sed -n '1p')
+  export RPC_PRIVKEY=$(echo "$CERTIFICATE_SETUP_OUTPUT" | sed -n '2p')
   nginx_http_conf+=$(sed -e "s/{{DOMAIN}}/$RPC_DOMAIN/" -e "s/{{ORIGIN_DOMAIN}}/$APP_DOMAIN/" "${REPO_ROOT_DIR}/docker-compose/templates/rpc-https_http.conf.template")
   nginx_http_conf+=$'\n'
   nginx_http_conf+=$(cat "${REPO_ROOT_DIR}/docker-compose/https-redirect_http.conf")
@@ -55,11 +58,26 @@ else
   nginx_http_conf+=$'\n'
 fi
 
-if [[ " ${composeFiles[*]} " =~ " ${REPO_ROOT_DIR}/docker-compose/rpc-https.yml " ]]; then
-  CERTIFICATE_SETUP_OUTPUT=$(bash "$SCRIPT_DIR/setup-domain.sh" "$RPC_DOMAIN")
-  export RPC_FULLCHAIN=$(echo "$CERTIFICATE_SETUP_OUTPUT" | sed -n '1p')
-  export RPC_PRIVKEY=$(echo "$CERTIFICATE_SETUP_OUTPUT" | sed -n '2p')
-fi
+for file in "${composeFiles[@]}"; do
+  if [[ $file =~ ${LOCAL_DATA_DIR}/docker/([^@]+)@([^:]+):([0-9]+)\.yml ]]; then
+    app_name=${BASH_REMATCH[1]}
+    domain=${BASH_REMATCH[2]}
+    port=${BASH_REMATCH[3]}
+
+    if [ "localhost" != "$domain" ]; then
+      CERTIFICATE_SETUP_OUTPUT=$(bash "$SCRIPT_DIR/setup-domain.sh" "$domain")
+      fullchain_var="${domain^^}_FULLCHAIN"
+      privkey_var="${domain^^}_PRIVKEY"
+      export "$fullchain_var"=$(echo "$CERTIFICATE_SETUP_OUTPUT" | sed -n '1p')
+      export "$privkey_var"=$(echo "$CERTIFICATE_SETUP_OUTPUT" | sed -n '2p')
+      nginx_http_conf+=$(sed -e "s|{{APP_NAME}}|$app_name|" -e "s|{{DOMAIN}}|$domain|" -e "s|{{PORT}}|$port|" "${REPO_ROOT_DIR}/docker-compose/templates/app-https_http.conf.template")
+      nginx_http_conf+=$'\n'
+    else
+      nginx_http_conf+=$(sed -e "s|{{APP_NAME}}|$app_name|" -e "s|{{DOMAIN}}|$domain|" -e "s|{{PORT}}|$port|" "${REPO_ROOT_DIR}/docker-compose/templates/app-localhost_http.conf.template")
+      nginx_http_conf+=$'\n'
+    fi
+  fi
+done
 
 if [[ " ${composeFiles[*]} " =~ " ${REPO_ROOT_DIR}/docker-compose/sealer.yml " ]]; then
   export CLEF_PASSWORD=$(prompt_for_clef_password)
@@ -85,6 +103,8 @@ export NGINX_HTTP_CONF="$nginx_http_conf"
 export NGINX_STREAM_CONF="$nginx_stream_conf"
 
 cd "$REPO_ROOT_DIR"
+
+echo $nginx_http_conf
 
 echo "Running Docker Compose with the following configuration: $composeFileArgs"
 docker-compose -p "local-blockchain-toolbox" $composeFileArgs up -d

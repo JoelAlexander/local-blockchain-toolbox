@@ -194,3 +194,29 @@ create_directory_if_not_exists "$LOCAL_DATA_DIR/profiles" >/dev/null
 create_directory_if_not_exists "$LOCAL_DATA_DIR/geth" >/dev/null
 create_directory_if_not_exists "$LOCAL_DATA_DIR/nodes" >/dev/null
 create_directory_if_not_exists "$LOCAL_DATA_DIR/ubuntu" >/dev/null
+
+export APP_STORAGE_DIR="$LOCAL_DATA_DIR/applications"
+mkdir -p "$APP_STORAGE_DIR"
+
+if jq -e '.applications // empty' "$ACTIVE_PROFILE_FILE" > /dev/null; then
+    ATTACHED_APPLICATIONS=($(jq -r '.applications[] | "\(.name)@\(.domain):\(.port)"' "$ACTIVE_PROFILE_FILE"))
+else
+    ATTACHED_APPLICATIONS=()  # Initialize as an empty array if applications are not available
+fi
+export ATTACHED_APPLICATIONS
+
+if [ -n "$PROFILE_CHAIN_RPC_DOMAIN" ]; then
+    if [ "localhost" == "$PROFILE_CHAIN_RPC_DOMAIN" ]; then
+        USED_ENDPOINTS=("$PROFILE_CHAIN_RPC_DOMAIN:80")
+    else
+        USED_ENDPOINTS=("$PROFILE_CHAIN_RPC_DOMAIN:443")
+    fi
+fi
+for app in "${ATTACHED_APPLICATIONS[@]}"; do
+    app_endpoint="${app##*@}" # Extracts everything after '@'
+    USED_ENDPOINTS+=("$app_endpoint")
+done
+export USED_ENDPOINTS
+
+export DOCKER_TEMP_DIR="$LOCAL_DATA_DIR/docker"
+mkdir -p "$DOCKER_TEMP_DIR"
