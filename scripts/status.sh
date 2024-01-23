@@ -58,6 +58,20 @@ else
     echo "No ENS attached."
 fi
 
+# Display attached agents
+echo -e "\n\033[1mAttached Agents:\033[0m"
+if [ ${#ATTACHED_AGENTS[@]} -eq 0 ]; then
+    echo "No agents attached."
+else
+    for agent in "${ATTACHED_AGENTS[@]}"; do
+        agent_name="${agent%@*}"
+        agent_account="${agent##*@}"
+        echo "Agent Name: $agent_name"
+        echo "Associated Account: 0x$agent_account"
+        # Add any additional details you wish to display about each agent here
+    done
+fi
+
 echo -e "\nBootnode Enode: $DEFAULT_BOOTNODE_ENODE"
 
 echo -e "\nStatus report completed."

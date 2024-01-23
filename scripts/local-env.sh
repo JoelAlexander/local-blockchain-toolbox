@@ -1,29 +1,33 @@
 #!/bin/bash
 SCRIPT_DIR=$(dirname "$0")
 
-get_git_root_dir() {
-    git rev-parse --show-toplevel 2>/dev/null
-}
+# Check if NVM is installed, and install it if it's not
+if [ ! -d "$HOME/.nvm" ]; then
+    echo "Installing NVM..."
+    curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.39.1/install.sh | bash
+fi
 
-# Set the repository root directory
-export REPO_ROOT_DIR=$(get_git_root_dir)
+# Load NVM
+export NVM_DIR="$HOME/.nvm"
+[ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh"
+[ -s "$NVM_DIR/bash_completion" ] && \. "$NVM_DIR/bash_completion"
+
+# Install and use Node.js version 16 if it's not already installed
+if ! nvm ls 16 &> /dev/null; then
+    echo "Installing Node.js version 16..."
+    nvm install 16
+fi
+nvm use 16
+
+export REPO_ROOT_DIR=$(git rev-parse --show-toplevel 2>/dev/null)
 if [ -z "$REPO_ROOT_DIR" ]; then
     echo "Error: Must run this script within a Git repository."
     exit 1
 fi
 
 export LOCAL_DATA_DIR="$REPO_ROOT_DIR/.local"
-
-# Function to create a directory if it does not exist
-create_directory_if_not_exists() {
-    local dir=$1
-    if [ ! -d "$dir" ]; then
-        mkdir -p "$dir"
-        echo "Created directory: $dir"
-    fi
-}
-
 mkdir -p "$LOCAL_DATA_DIR/profiles"
+
 ACTIVE_PROFILE_FILE_PATH="$LOCAL_DATA_DIR/active_profile"
 prompt_for_new_profile() {
     echo "No profiles found. Please create a new profile."
@@ -66,11 +70,9 @@ if [ ! -f "$ACTIVE_PROFILE_FILE" ]; then
     echo "{}" > "$ACTIVE_PROFILE_FILE"
 fi
 
-# Create the active profile directory and file if they don't exist
-create_directory_if_not_exists "$ACTIVE_PROFILE_DIRECTORY"
+mkdir -p "$ACTIVE_PROFILE_DIRECTORY"
 [ ! -f "$ACTIVE_PROFILE_FILE" ] && echo "{}" > "$ACTIVE_PROFILE_FILE"
 
-# TODO: Assumes linux
 machine=$(uname -m)
 if [ $machine == "x86_64" ]; then
   variant="amd64"
@@ -111,7 +113,6 @@ build_docker_images_if_needed() {
     fi
 }
 
-# Call the function to ensure Docker images are built
 build_docker_images_if_needed
 
 PROFILE_CLEF_DIR="$ACTIVE_PROFILE_DIRECTORY/clef"
@@ -122,7 +123,6 @@ export PROFILE_ETHEREUM_DIR
 
 mkdir -p $PROFILE_CLEF_DIR $PROFILE_ETHEREUM_DIR
 
-# Set chain-specific environment variables
 PROFILE_CHAIN_NAME=$(jq -r '.chain // empty' "$ACTIVE_PROFILE_FILE")
 [ -n "$PROFILE_CHAIN_NAME" ] && export PROFILE_CHAIN_NAME
 
@@ -132,7 +132,6 @@ PROFILE_CHAIN_RPC_DOMAIN=$(jq -r '.rpc.domain // empty' "$ACTIVE_PROFILE_FILE")
 PROFILE_CHAIN_GENESIS_FILE="$LOCAL_DATA_DIR/chains/$PROFILE_CHAIN_NAME/genesis.json"
 [ -f "$PROFILE_CHAIN_GENESIS_FILE" ] && export PROFILE_CHAIN_GENESIS_FILE
 
-# Check if the accounts array exists and is not null
 if jq -e '.accounts // empty' "$ACTIVE_PROFILE_FILE" > /dev/null; then
     PROFILE_LINKED_ACCOUNTS=($(jq -r '.accounts[]' "$ACTIVE_PROFILE_FILE"))
     if [ -z "$PROFILE_ACTIVE_ACCOUNT" ] && [ ${#PROFILE_LINKED_ACCOUNTS[@]} -gt 0 ]; then
@@ -141,7 +140,7 @@ if jq -e '.accounts // empty' "$ACTIVE_PROFILE_FILE" > /dev/null; then
 
     export PROFILE_LINKED_ACCOUNTS=("${PROFILE_LINKED_ACCOUNTS[@]}")
 else
-    PROFILE_LINKED_ACCOUNTS=()  # Initialize as an empty array if accounts are not available
+    PROFILE_LINKED_ACCOUNTS=()
     export PROFILE_LINKED_ACCOUNTS
 fi
 
@@ -159,8 +158,6 @@ if [ ! -z "$ENS_NAME" ]; then
 fi
 
 ENS_JSON_FILE="$LOCAL_DATA_DIR/chains/$PROFILE_CHAIN_NAME/ens.json"
-
-# Check if ENS JSON file exists and read the address associated with the ENS name
 if [ -f "$ENS_JSON_FILE" ]; then
     ENS_ADDRESS=$(jq -r --arg ensName "$ENS_NAME" '.[$ensName] // empty' "$ENS_JSON_FILE")
     if [ -n "$ENS_ADDRESS" ]; then
@@ -171,7 +168,7 @@ else
 fi
 
 export BOOTNODES_DIR="$LOCAL_DATA_DIR/bootnodes"
-create_directory_if_not_exists "$BOOTNODES_DIR"
+mkdir -p "$BOOTNODES_DIR"
 export DEFAULT_BOOTNODE_KEY="$BOOTNODES_DIR/default/bootnode.key"
 if [ ! -f "$DEFAULT_BOOTNODE_KEY" ]; then
     mkdir -p "$BOOTNODES_DIR/default"
@@ -182,18 +179,18 @@ bootnodeKey=$(cat "$DEFAULT_BOOTNODE_KEY")
 export DEFAULT_BOOTNODE_ENODE=$($GETH_DIR/bootnode -nodekeyhex $bootnodeKey -writeaddress)
 
 export CERTS_DIR="$LOCAL_DATA_DIR/certbot"
-create_directory_if_not_exists $CERTS_DIR > /dev/null
+mkdir -p $CERTS_DIR
 
 export KEYSTORE_DIR="$LOCAL_DATA_DIR/keystore"
-create_directory_if_not_exists $KEYSTORE_DIR > /dev/null
+mkdir -p $KEYSTORE_DIR
 
-create_directory_if_not_exists "$LOCAL_DATA_DIR" >/dev/null
-create_directory_if_not_exists "$LOCAL_DATA_DIR/.ssh" >/dev/null
-create_directory_if_not_exists "$LOCAL_DATA_DIR/chains" >/dev/null
-create_directory_if_not_exists "$LOCAL_DATA_DIR/profiles" >/dev/null
-create_directory_if_not_exists "$LOCAL_DATA_DIR/geth" >/dev/null
-create_directory_if_not_exists "$LOCAL_DATA_DIR/nodes" >/dev/null
-create_directory_if_not_exists "$LOCAL_DATA_DIR/ubuntu" >/dev/null
+mkdir -p "$LOCAL_DATA_DIR"
+mkdir -p "$LOCAL_DATA_DIR/.ssh"
+mkdir -p "$LOCAL_DATA_DIR/chains"
+mkdir -p "$LOCAL_DATA_DIR/profiles"
+mkdir -p "$LOCAL_DATA_DIR/geth"
+mkdir -p "$LOCAL_DATA_DIR/nodes"
+mkdir -p "$LOCAL_DATA_DIR/ubuntu"
 
 export APP_STORAGE_DIR="$LOCAL_DATA_DIR/applications"
 mkdir -p "$APP_STORAGE_DIR"
@@ -201,9 +198,19 @@ mkdir -p "$APP_STORAGE_DIR"
 if jq -e '.applications // empty' "$ACTIVE_PROFILE_FILE" > /dev/null; then
     ATTACHED_APPLICATIONS=($(jq -r '.applications[] | "\(.name)@\(.domain):\(.port)"' "$ACTIVE_PROFILE_FILE"))
 else
-    ATTACHED_APPLICATIONS=()  # Initialize as an empty array if applications are not available
+    ATTACHED_APPLICATIONS=()
 fi
 export ATTACHED_APPLICATIONS
+
+export AGENTS_DIR="$LOCAL_DATA_DIR/agents"
+mkdir -p "$AGENTS_DIR"
+
+if jq -e '.agents // empty' "$ACTIVE_PROFILE_FILE" > /dev/null; then
+    ATTACHED_AGENTS=($(jq -r '.agents[] | "\(.name)@\(.account)"' "$ACTIVE_PROFILE_FILE"))
+else
+    ATTACHED_AGENTS=()
+fi
+export ATTACHED_AGENTS
 
 if [ -n "$PROFILE_CHAIN_RPC_DOMAIN" ]; then
     if [ "localhost" == "$PROFILE_CHAIN_RPC_DOMAIN" ]; then
@@ -213,7 +220,7 @@ if [ -n "$PROFILE_CHAIN_RPC_DOMAIN" ]; then
     fi
 fi
 for app in "${ATTACHED_APPLICATIONS[@]}"; do
-    app_endpoint="${app##*@}" # Extracts everything after '@'
+    app_endpoint="${app##*@}"
     USED_ENDPOINTS+=("$app_endpoint")
 done
 export USED_ENDPOINTS
